@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react"
 import type { CardanoAPI, WalletConnection, WalletName } from "@/lib/cardano-types"
 import { detectAvailableWallets, getWalletAPI, formatLovelace } from "@/lib/wallet-utils"
 import { createSession, saveSession, clearSession, isSessionValid, getSession } from "@/lib/session"
+import { requestChallenge, verifySignature } from "@/app/api/auth/authService"
 
 // Authentication types
 interface BackendResponse<T> {
@@ -32,8 +33,6 @@ interface AuthState {
   accessToken: string | null
   step: 'select' | 'connected' | 'signing' | 'authenticated'
 }
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'
 
 export const useCardanoWallet = () => {
   const [wallet, setWallet] = useState<WalletConnection | null>(null)
@@ -125,52 +124,23 @@ export const useCardanoWallet = () => {
 
     try {
       // Step 1: Request challenge from backend
-      console.log('📤 Requesting challenge:', { address: wallet.address, walletType: wallet.name })
-      const challengeRes = await fetch(`${API_BASE_URL}/auth/challenge`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          address: wallet.address,
-          walletType: wallet.name.toUpperCase(),
-        }),
-      })
-
-      if (!challengeRes.ok) {
-        throw new Error('Failed to get challenge from server')
-      }
-
-      const challengeData: BackendResponse<ChallengeData> = await challengeRes.json()
-      const { message, nonce } = challengeData.data
-      console.log('📥 Challenge received:', { nonce, message })
+      const challengeData = await requestChallenge(wallet.address, wallet.name)
+      const { message, nonce, externalAad } = challengeData.data
 
       // Step 2: Get stake address (reward address) for signing
-      // IMPORTANT: We must sign with stake address to verify ownership!
       const rewardAddresses = await walletAPI.getRewardAddresses()
       if (!rewardAddresses || rewardAddresses.length === 0) {
         throw new Error('No reward address found in wallet')
       }
       const stakeAddrHex = rewardAddresses[0]
-      
-      // Debug: Convert stake address hex to bech32
       const { Address } = await import('@emurgo/cardano-serialization-lib-browser')
       const stakeAddrBech32 = Address.from_bytes(Buffer.from(stakeAddrHex, 'hex')).to_bech32()
-      
-      console.log('=== Frontend Signing Debug ===')
-      console.log('🔑 Stake address (hex):', stakeAddrHex)
-      console.log('🔑 Stake address (bech32):', stakeAddrBech32)
-      console.log('📝 Message:', message)
-      console.log('📝 Message length:', message.length)
 
       // Step 3: Sign with STAKE ADDRESS
       const messageHex = Buffer.from(message, 'utf8').toString('hex')
       const signResult = await walletAPI.signData(stakeAddrHex, messageHex)
-      console.log('Done Step 3: ✍️ Signature created with stake key')
 
-      // Step 4: Get externalAad from challenge response
-      const externalAad = challengeData.data.externalAad || ''
-      console.log('Done Step 4: 🔑 External AAD:', externalAad)
-      
-      // Step 5: Verify with backend
+      // Step 5: Verify with backend using AuthService
       const verifyPayload = {
         walletAddress: wallet.address,
         nonce,
@@ -179,37 +149,21 @@ export const useCardanoWallet = () => {
         publicKey: signResult.key,
         walletType: wallet.name.toUpperCase(),
       }
-      console.log('Done Step 5: 📝 Verify payload:', verifyPayload) 
-      const verifyRes = await fetch(`${API_BASE_URL}/auth/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(verifyPayload),
-      })
-      console.log('Done Step 6: 📝 Verify response:', verifyRes)
-      if (!verifyRes.ok) {
-        const errorData = await verifyRes.json().catch(() => ({}))
-        throw new Error(errorData.message || 'Verification failed')
-      }
-      const verifyData: BackendResponse<VerifyData> = await verifyRes.json()
+      const verifyData = await verifySignature(verifyPayload)
       const { accessToken, user: userData } = verifyData.data
-      
       // Create and save session
       const session = createSession(wallet.address, wallet.name)
       saveSession(session)
-      console.log('Done Step 8: 📝 Session:', session)
-      // Update auth state
       setAuthState({
         isAuthenticated: true,
         user: userData,
         accessToken,
         step: 'authenticated'
       })
-      console.log('✅ Authentication successful!')
       return { accessToken, user: userData }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed')
       setAuthState(prev => ({ ...prev, step: 'connected' }))
-      console.error('❌ Authentication error:', err)
       throw err
     } finally {
       setLoading(false)

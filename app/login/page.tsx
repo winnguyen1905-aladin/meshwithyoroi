@@ -24,6 +24,7 @@ export default function LoginPage() {
 
   // Redirect to dashboard if already authenticated
   useEffect(() => {
+    console.log("wallet.isAuthenticated", wallet.isAuthenticated, mounted)
     if (wallet.isAuthenticated && mounted) {
       router.push("/dashboard")
     }
@@ -43,7 +44,7 @@ export default function LoginPage() {
   }
 
   const handleAuthenticate = async () => {
-    setIsAuthenticating(true)
+    setIsAuthenticating(true) 
     try {
       await wallet.authenticate()
       // Authentication successful, redirect will happen via useEffect

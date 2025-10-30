@@ -11,7 +11,8 @@ import { TransactionBuilder } from "@/components/transaction-builder"
 import { EscrowManager } from "@/components/escrow-manager"
 import { TransactionHistory } from "@/components/transaction-history"
 import { Button } from "@/components/ui/button"
-import { v4 as uuidv4 } from "crypto"
+import { v4 as uuidv4 } from "uuid"
+import { WalletName } from "@/lib/cardano-types"
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -71,6 +72,10 @@ export default function DashboardPage() {
     escrow.releaseEscrow(id)
   }
 
+  const handleWalletConnect = async (walletName: WalletName) => {
+    await wallet.connectWallet(walletName)
+  }
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-background to-muted/20">
       <div className="container mx-auto px-4 py-8">
@@ -90,7 +95,7 @@ export default function DashboardPage() {
           <div className="max-w-4xl mx-auto">
             <WalletSelector
               availableWallets={wallet.availableWallets}
-              onSelect={wallet.connectWallet}
+              onSelect={handleWalletConnect}
               loading={wallet.loading}
             />
           </div>
