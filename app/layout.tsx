@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import Link from "next/link"
 import { WalletProvider } from "@/context/wallet-context"
+import { Providers } from "./providers"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -37,9 +38,11 @@ export default function RootLayout({
             </nav>
           </div>
         </header>
-        <WalletProvider>
-          {children}
-        </WalletProvider>
+        <Providers>
+          <WalletProvider>
+            {children}
+          </WalletProvider>
+        </Providers>
       </body>
     </html>
   )

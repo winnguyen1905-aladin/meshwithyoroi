@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { BrowserWallet } from '@meshsdk/core';
 import { getSession, createSession, saveSession, clearSession, isSessionValid } from '@/lib/session';
 import { requestChallenge, verifySignature } from '@/app/api/auth/authService';
 import type { WalletName, WalletConnection } from '@/types/cardano.types';
@@ -61,6 +60,8 @@ export const useAuth = () => {
       setLoading(true);
 
       try {
+        // Dynamic import để chỉ load ở client-side
+        const { BrowserWallet } = await import('@meshsdk/core');
         const api = await BrowserWallet.enable(walletName);
         setWalletAPI(api);
 

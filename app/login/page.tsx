@@ -22,10 +22,10 @@ export default function LoginPage() {
     setMounted(true);
   }, []);
 
-  // Redirect to dashboard nếu đã authenticated
+  // Redirect to setup-password nếu đã authenticated
   useEffect(() => {
     if (mounted && wallet.isAuthenticated) {
-      router.push("/dashboard");
+      router.push("/setup-password");
     }
   }, [mounted, wallet.isAuthenticated, router]);
 

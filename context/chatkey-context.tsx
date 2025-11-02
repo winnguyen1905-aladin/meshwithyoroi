@@ -1,60 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import * as bip39 from 'bip39';
 import { derivePath, getPublicKey } from 'ed25519-hd-key';
-import crypto from 'crypto';
 import { E2EE_PATH } from '@/lib/constants';
+import { encryptKey, decryptKey } from '@/lib/e2ee-utils';
 
 const STORAGE_KEYS = {
   SESSION_KEY: 'session_key',
   CHAT_KEY_BLOB: 'chat_key_blob',
 } as const;
 const MIN_PASSWORD_LENGTH = 8;
-
-export const encryptKey = (privateKey: Buffer, password: string): string => {
-  const salt = crypto.randomBytes(16);
-  const iv = crypto.randomBytes(12);
-  const key = crypto.scryptSync(password, salt, 32);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  
-  const encrypted = Buffer.concat([cipher.update(privateKey), cipher.final()]);
-  const tag = cipher.getAuthTag();
-
-  // Returns JSON string with hex-encoded buffers
-  return JSON.stringify({
-    encrypted: encrypted.toString('hex'),
-    iv: iv.toString('hex'),
-    salt: salt.toString('hex'),
-    tag: tag.toString('hex'),
-  });
-};
-
-export const decryptKey = (encryptedKeyBlob: string, password: string): Buffer => {
-  try {
-    // Handle double-stringified JSON (for backward compatibility)
-    let parsed: { encrypted: string; iv: string; salt: string; tag: string };
-    try {
-      parsed = JSON.parse(encryptedKeyBlob);
-    } catch {
-      // Try parsing again in case it's double-stringified
-      parsed = JSON.parse(JSON.parse(encryptedKeyBlob));
-    }
-
-    const { encrypted, iv, salt, tag } = parsed;
-
-    const key = crypto.scryptSync(password, salt, 32);
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'hex'));
-    decipher.setAuthTag(Buffer.from(tag, 'hex'));
-
-    const decrypted = Buffer.concat([
-      decipher.update(Buffer.from(encrypted, 'hex')),
-      decipher.final(),
-    ]);
-    
-    return decrypted;
-  } catch (error) {
-    throw new Error('Failed to decrypt key: Invalid password or corrupted data');
-  }
-};
 
 interface ChatKeyContextValue {
   privateKey: Buffer | null;
@@ -70,7 +24,7 @@ interface ChatKeyContextValue {
 const ChatKeyContext = createContext<ChatKeyContextValue | undefined>(undefined);
 
 export const ChatKeyProvider = ({ children }: { children: ReactNode }) => {
-  
+
   const [isLocked, setIsLocked] = useState(true);
   const [keyExists, setKeyExists] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +47,7 @@ export const ChatKeyProvider = ({ children }: { children: ReactNode }) => {
       case !!storedKeyBlob:
         setIsLocked(true);  
         setKeyExists(true);
-        setEncryptedKeyBlob(encryptedKeyBlob);
+        setEncryptedKeyBlob(storedKeyBlob);
         break;
       default:
         setKeyExists(false);
@@ -113,7 +67,7 @@ export const ChatKeyProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('No encrypted key found. Please create keys first.');
       }
 
-      const decryptedPrivateKey = decryptKey(encryptedKeyBlob, localPassword);
+      const decryptedPrivateKey = await decryptKey(encryptedKeyBlob, localPassword);
       sessionStorage.setItem(STORAGE_KEYS.SESSION_KEY, decryptedPrivateKey.toString('hex'));
 
       setPrivateKey(decryptedPrivateKey);
@@ -143,8 +97,9 @@ export const ChatKeyProvider = ({ children }: { children: ReactNode }) => {
       const seed = bip39.mnemonicToSeedSync(mnemonic);
       const { key: chatPrivateKey } = derivePath(E2EE_PATH, seed.toString('hex'));
 
-      const encryptedBlob = encryptKey(chatPrivateKey, localPassword);
+      const encryptedBlob = await encryptKey(chatPrivateKey, localPassword);
       localStorage.setItem(STORAGE_KEYS.CHAT_KEY_BLOB, encryptedBlob);
+      sessionStorage.setItem(STORAGE_KEYS.SESSION_KEY, chatPrivateKey.toString('hex'));
 
       setPrivateKey(chatPrivateKey);
       setPublicKey(getPublicKey(chatPrivateKey));
