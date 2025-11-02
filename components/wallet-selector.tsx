@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { SUPPORTED_WALLETS } from "@/lib/wallet-utils"
-import { WalletName } from "@/lib/cardano-types"
+import { WalletName } from "@/types/cardano.types"
 
 interface WalletSelectorProps {
   availableWallets: WalletName[]

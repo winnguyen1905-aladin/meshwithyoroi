@@ -25,6 +25,27 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@/hooks/*": [
+        "./hooks/*"
+      ],
+      "@/context/*": [
+        "./context/*"
+      ],
+      "@/types/*": [
+        "./types/*"
+      ],
+      "@/lib/*": [
+        "./lib/*"
+      ],
+      "@/components/*": [
+        "./components/*"
+      ],
+      "@/app/*": [
+        "./app/*"
+      ],
+      "@/contracts/*": [
+        "./contracts/*"
       ]
     }
   },

@@ -10,8 +10,7 @@ const api = axios.create({
   },
 });
 
-// Dùng interceptor để tự động thêm token vào MỌI request
-// mà instance 'api' này thực hiện
+// Dùng interceptor để tự động thêm token vào MỌI request mà instance 'api' này thực hiện
 api.interceptors.request.use(
   (config) => {
     // Chỉ chạy ở phía client (trình duyệt)

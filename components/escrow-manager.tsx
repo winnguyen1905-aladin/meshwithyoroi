@@ -6,7 +6,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import type { EscrowContract } from "@/lib/cardano-types"
+import type { EscrowContract } from "@/types/cardano.types"
 
 interface EscrowManagerProps {
   escrows: EscrowContract[]

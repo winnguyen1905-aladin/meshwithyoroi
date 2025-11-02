@@ -1,73 +1,77 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { useCardanoWallet } from "@/hooks/use-cardano-wallet"
-import { WalletLoginCard } from "@/components/wallet-login-card"
-import { Button } from "@/components/ui/button"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Spinner } from "@/components/ui/spinner"
-import Link from "next/link"
-import { WalletName } from "@/lib/cardano-types"
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+import { WalletLoginCard } from "@/components/wallet-login-card";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Spinner } from "@/components/ui/spinner";
+
+import { WalletName } from "@/types/cardano.types";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function LoginPage() {
+  const wallet = useAuth();  
   const router = useRouter();
-  const wallet = useCardanoWallet();
   const [mounted, setMounted] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState<WalletName | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
- 
+
   useEffect(() => {
     setMounted(true);
-  }, [])
+  }, []);
 
-  // Redirect to dashboard if already authenticated
+  // Redirect to dashboard nếu đã authenticated
   useEffect(() => {
-    console.log("wallet.isAuthenticated", wallet.isAuthenticated, mounted)
-    if (wallet.isAuthenticated && mounted) {
-      router.push("/dashboard")
+    if (mounted && wallet.isAuthenticated) {
+      router.push("/dashboard");
     }
-  }, [wallet.isAuthenticated, mounted, router])
+  }, [mounted, wallet.isAuthenticated, router]);
+
+  // Derive UI states từ hook để tránh state dư thừa
+  const isConnecting = useMemo(
+    () => wallet.loading && wallet.authStep === "select" && !!selectedWallet,
+    [wallet.loading, wallet.authStep, selectedWallet]
+  );
+  const isAuthenticating = useMemo(
+    () => wallet.authStep === "signing",
+    [wallet.authStep]
+  );
 
   const handleWalletConnect = async (walletName: WalletName) => {
-    setSelectedWallet(walletName)
-    setIsConnecting(true)
     try {
-      await wallet.connectWallet(walletName)
-      // Wallet connected, ready for authentication
+      setSelectedWallet(walletName);
+      await wallet.connectWallet(walletName);
+      // Sau khi connect xong, bước sẽ chuyển sang 'connected' theo hook
     } catch (error) {
-      console.error("Failed to connect wallet:", error)
-      setIsConnecting(false)
-      setSelectedWallet(null)
+      console.error("Failed to connect wallet:", error);
+      setSelectedWallet(null);
     }
-  }
+  };
 
   const handleAuthenticate = async () => {
-    setIsAuthenticating(true) 
     try {
-      await wallet.authenticate()
-      // Authentication successful, redirect will happen via useEffect
+      await wallet.authenticate();
+      // Redirect sẽ tự chạy ở useEffect khi isAuthenticated = true
     } catch (error) {
-      console.error("Authentication failed:", error)
-      setIsAuthenticating(false)
+      console.error("Authentication failed:", error);
     }
-  }
+  };
 
   const handleDisconnect = () => {
-    wallet.disconnectWallet()
-    setSelectedWallet(null)
-    setIsConnecting(false)
-    setIsAuthenticating(false)
-  }
+    wallet.disconnectWallet();
+    setSelectedWallet(null);
+  };
 
-  if (!mounted) return null
+  if (!mounted) return null;
 
-  // Helper function to truncate address
+  // Helper: rút gọn địa chỉ
   const truncateAddress = (addr: string) => {
-    if (addr.length <= 20) return addr
-    return `${addr.slice(0, 10)}...${addr.slice(-10)}`
-  }
+    if (!addr) return "";
+    if (addr.length <= 20) return addr;
+    return `${addr.slice(0, 10)}...${addr.slice(-10)}`;
+  };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 flex items-center justify-center px-4 py-12">
@@ -87,22 +91,16 @@ export default function LoginPage() {
                 </span>
               </h1>
               <p className="text-lg text-muted-foreground max-w-md leading-relaxed">
-                Connect your Cardano wallet securely. Manage transactions, escrow contracts, and digital assets with
-                ease.
+                Connect your Cardano wallet securely. Manage transactions, escrow contracts, and digital assets with ease.
               </p>
             </div>
 
-            {/* Features List */}
+            {/* Features */}
             <div className="space-y-4">
               <div className="flex gap-4 items-start">
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
                   <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 <div>
@@ -114,12 +112,7 @@ export default function LoginPage() {
               <div className="flex gap-4 items-start">
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
                   <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
                 </div>
                 <div>
@@ -141,7 +134,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Footer Text */}
             <p className="text-sm text-muted-foreground">
               By connecting your wallet, you agree to our{" "}
               <Link href="#" className="text-primary hover:underline">
@@ -154,9 +146,9 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Right Section - Authentication Flow */}
+          {/* Right Section - Auth Flow */}
           <div className="space-y-6">
-            {/* Error Display */}
+            {/* Error */}
             {wallet.error && (
               <Alert variant="destructive">
                 <AlertDescription>
@@ -168,15 +160,14 @@ export default function LoginPage() {
               </Alert>
             )}
 
-            {/* Step 1: Wallet Selection */}
-            {wallet.authStep === 'select' && (
+            {/* Step 1: Select */}
+            {wallet.authStep === "select" && (
               <>
                 <div className="space-y-2">
                   <h2 className="text-2xl font-bold">Connect Your Wallet</h2>
                   <p className="text-muted-foreground">Choose your preferred Cardano wallet to get started</p>
                 </div>
 
-                {/* Wallet Cards */}
                 <div className="space-y-3">
                   {wallet.availableWallets.map((walletName) => (
                     <WalletLoginCard
@@ -189,7 +180,6 @@ export default function LoginPage() {
                   ))}
                 </div>
 
-                {/* No Wallets Message */}
                 {wallet.availableWallets.length === 0 && (
                   <div className="p-4 rounded-lg bg-muted/50 border border-border">
                     <p className="text-sm text-muted-foreground">
@@ -198,7 +188,6 @@ export default function LoginPage() {
                   </div>
                 )}
 
-                {/* Divider */}
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-border" />
@@ -208,22 +197,18 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Demo Mode */}
                 <Button
                   variant="outline"
                   className="w-full h-12 text-base bg-transparent"
-                  onClick={() => {
-                    // Demo mode - skip wallet connection
-                    router.push("/dashboard")
-                  }}
+                  onClick={() => router.push("/dashboard")}
                 >
                   Continue as Demo User
                 </Button>
               </>
             )}
 
-            {/* Step 2: Wallet Connected - Ready to Authenticate */}
-            {wallet.authStep === 'connected' && wallet.wallet && (
+            {/* Step 2: Connected */}
+            {wallet.authStep === "connected" && wallet.wallet && (
               <div className="space-y-6">
                 <div className="text-center space-y-4">
                   <div className="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center">
@@ -264,16 +249,10 @@ export default function LoginPage() {
                         Authenticating...
                       </>
                     ) : (
-                      <>
-                        🔑 Sign & Authenticate
-                      </>
+                      <>🔑 Sign & Authenticate</>
                     )}
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleDisconnect}
-                    className="w-full h-12 text-base"
-                  >
+                  <Button variant="outline" onClick={handleDisconnect} className="w-full h-12 text-base">
                     ← Back to Wallet Selection
                   </Button>
                 </div>
@@ -281,7 +260,7 @@ export default function LoginPage() {
             )}
 
             {/* Step 3: Signing */}
-            {wallet.authStep === 'signing' && (
+            {wallet.authStep === "signing" && (
               <div className="text-center space-y-6">
                 <div className="w-16 h-16 mx-auto rounded-full bg-blue-100 flex items-center justify-center">
                   <Spinner className="w-8 h-8 text-blue-600" />
@@ -296,7 +275,7 @@ export default function LoginPage() {
             )}
 
             {/* Step 4: Authenticated */}
-            {wallet.authStep === 'authenticated' && wallet.user && (
+            {wallet.authStep === "authenticated" && wallet.user && (
               <div className="text-center space-y-6">
                 <div className="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center">
                   <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -319,18 +298,18 @@ export default function LoginPage() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-muted-foreground">Wallet:</span>
-                    <span className="text-sm font-mono">{truncateAddress(wallet.wallet?.address || '')}</span>
+                    <span className="text-sm font-mono">
+                      {truncateAddress(wallet.wallet?.address || "")}
+                    </span>
                   </div>
                 </div>
 
-                <p className="text-sm text-muted-foreground">
-                  Redirecting to dashboard...
-                </p>
+                <p className="text-sm text-muted-foreground">Redirecting to dashboard...</p>
               </div>
             )}
           </div>
         </div>
       </div>
     </main>
-  )
+  );
 }

@@ -1,4 +1,4 @@
-import { WalletName } from "./cardano-types"
+import { WalletName } from "../types/cardano.types"
 
 // Utility functions for wallet detection and interaction
 export const SUPPORTED_WALLETS = {

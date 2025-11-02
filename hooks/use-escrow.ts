@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import type { EscrowContract } from "@/lib/cardano-types"
+import type { EscrowContract } from "@/types/cardano.types"
 
 export const useEscrow = () => {
   const [escrows, setEscrows] = useState<EscrowContract[]>([])

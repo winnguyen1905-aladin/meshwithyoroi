@@ -1,0 +1,67 @@
+'use client';
+
+import { useCallback, useState } from 'react';
+import { useWalletContext } from '@/context/wallet-context';
+import { fundEscrow, type EscrowFundParams, getDefaultChangeAddress } from '@/lib/escrow-service';
+import type { EscrowFundResult } from '@/lib/escrow-service';
+
+/**
+ * LOW-LEVEL Hook for generic escrow funding
+ * 
+ * Use this when:
+ * - You already have key hashes (aladinKeyHashHex, genieKeyHashHex)
+ * - Need flexibility for custom escrow types (not just job)
+ * - Want fine-grained control over parameters
+ * 
+ * For job-specific escrow, use `useJobFund` instead.
+ * 
+ * @example
+ * ```typescript
+ * const { fund } = useEscrowFund();
+ * await fund({
+ *   aladinKeyHashHex: "abc123...",  // Already converted
+ *   genieKeyHashHex: "def456...",   // Already converted
+ *   jobIdHex: "550e8400...",
+ *   scriptAddress: "addr_xxx",
+ *   paymentAmountLovelace: "100000000",
+ *   stateCtorIndex: 0,
+ * });
+ * ```
+ */
+export function useEscrowFund() {
+  const { walletAPI } = useWalletContext();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fund = useCallback(
+    async (p: Omit<EscrowFundParams, 'walletAPI' | 'changeAddress'> & { changeAddress?: string }): Promise<EscrowFundResult> => {
+      if (!walletAPI) throw new Error('Wallet not connected');
+      setError(null);
+      setLoading(true);
+
+      try {
+        const changeAddress = p.changeAddress ?? (await getDefaultChangeAddress(walletAPI));
+        
+        const result = await fundEscrow({
+          ...p,
+          walletAPI,
+          changeAddress,
+        });
+
+        return result;
+      } catch (e: any) {
+        const msg = e?.message ?? 'Escrow fund failed';
+        setError(msg);
+        throw e;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [walletAPI]
+  );
+
+  return { fund, loading, error };
+}
+
+// Re-export types for convenience
+export type { EscrowFundParams, EscrowFundResult } from '@/lib/escrow-service';

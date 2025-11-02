@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import type { WalletConnection } from "@/lib/cardano-types"
+import type { WalletConnection } from "@/types/cardano.types"
 
 interface WalletInfoProps {
   wallet: WalletConnection

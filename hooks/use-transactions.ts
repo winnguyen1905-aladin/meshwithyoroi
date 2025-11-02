@@ -1,54 +1,76 @@
-"use client"
+'use client';
 
-import { useState, useCallback } from "react"
-import type { Transaction } from "@/lib/cardano-types"
+import { useState, useCallback } from 'react';
+import { useWalletContext } from '@/context/wallet-context';
 
 export const useTransactions = () => {
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [loading, setLoading] = useState(false)
+  const { walletAPI } = useWalletContext();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const addTransaction = useCallback((tx: Transaction) => {
-    setTransactions((prev) => [tx, ...prev])
-    // Persist to localStorage
-    const stored = localStorage.getItem("cardano_transactions")
-    const txList = stored ? JSON.parse(stored) : []
-    localStorage.setItem("cardano_transactions", JSON.stringify([tx, ...txList]))
-  }, [])
-
-  const updateTransaction = useCallback((id: string, updates: Partial<Transaction>) => {
-    setTransactions((prev) => prev.map((tx) => (tx.id === id ? { ...tx, ...updates } : tx)))
-
-    const stored = localStorage.getItem("cardano_transactions")
-    const txList = stored ? JSON.parse(stored) : []
-    const updated = txList.map((tx: Transaction) => (tx.id === id ? { ...tx, ...updates } : tx))
-    localStorage.setItem("cardano_transactions", JSON.stringify(updated))
-  }, [])
-
-  const loadTransactions = useCallback(() => {
-    setLoading(true)
-    try {
-      const stored = localStorage.getItem("cardano_transactions")
-      if (stored) {
-        setTransactions(JSON.parse(stored))
+  // Sign transaction
+  const signTransaction = useCallback(
+    async (txCborHex: string) => {
+      if (!walletAPI) {
+        throw new Error('Wallet not connected');
       }
-    } finally {
-      setLoading(false)
-    }
-  }, [])
 
-  const getTransactionsByType = useCallback(
-    (type: Transaction["type"]) => {
-      return transactions.filter((tx) => tx.type === type)
+      setLoading(true);
+      setError(null);
+
+      try {
+        const signedTx = await walletAPI.signTx(txCborHex);
+        return signedTx;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to sign transaction';
+        setError(message);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
     },
-    [transactions],
-  )
+    [walletAPI]
+  );
+
+  // Submit transaction
+  const submitTransaction = useCallback(
+    async (signedTxCborHex: string) => {
+      if (!walletAPI) {
+        throw new Error('Wallet not connected');
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const txHash = await walletAPI.submitTx(signedTxCborHex);
+        return txHash;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to submit transaction';
+        setError(message);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [walletAPI]
+  );
+
+  // Sign and submit in one go
+  const signAndSubmit = useCallback(
+    async (txCborHex: string) => {
+      const signedTx = await signTransaction(txCborHex);
+      const txHash = await submitTransaction(signedTx);
+      return txHash;
+    },
+    [signTransaction, submitTransaction]
+  );
 
   return {
-    transactions,
+    signTransaction,
+    submitTransaction,
+    signAndSubmit,
     loading,
-    addTransaction,
-    updateTransaction,
-    loadTransactions,
-    getTransactionsByType,
-  }
-}
+    error,
+  };
+};

@@ -1,6 +1,6 @@
 "use client"
 
-import type { Transaction } from "@/lib/cardano-types"
+import type { Transaction } from "@/types/cardano.types"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 

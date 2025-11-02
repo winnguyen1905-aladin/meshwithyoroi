@@ -9,7 +9,7 @@ export function middleware(request: NextRequest) {
 
   // Allow public routes
   // TODO: tạm export dashboard để test, sau này check login rồi mới public
-  const publicRoutes = ["/login", "/api", "/dashboard"]
+  const publicRoutes = ["/login", "/api", "/dashboard", "/job"]
   if (publicRoutes.some((route) => pathname.startsWith(route))) {
     return NextResponse.next()
   }

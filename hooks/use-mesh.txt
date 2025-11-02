@@ -1,0 +1,226 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { BrowserWallet, type Wallet } from "@meshsdk/core";
+import { getSession, createSession, saveSession, clearSession, isSessionValid } from "@/lib/session";
+import type { WalletConnection, WalletName } from "@/types/cardano.types";
+import { requestChallenge, verifySignature } from "@/app/api/auth/authService";
+
+// Lovelace -> ADA string
+const formatAda = (lovelace: string) => {
+  try {
+    const ada = Number(BigInt(lovelace)) / 1_000_000;
+    return ada.toLocaleString(undefined, { maximumFractionDigits: 6 });
+  } catch {
+    return "0";
+  }
+};
+
+interface AuthState {
+  isAuthenticated: boolean;
+  user: { id: string; newAccount: boolean } | null;
+  accessToken: string | null;
+  step: "select" | "connected" | "signing" | "authenticated";
+}
+
+export const useMesh = () => {
+  const [wallet, setWallet] = useState<WalletConnection | null>(null);
+  const [walletAPI, setWalletAPI] = useState<BrowserWallet | null>(null);
+  const [availableWallets, setAvailableWallets] = useState<WalletName[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [authState, setAuthState] = useState<AuthState>({
+    isAuthenticated: false,
+    user: null,
+    accessToken: null,
+    step: "select",
+  });
+
+  // Detect wallets
+  useEffect(() => {
+    (async () => {
+      try {
+        const wallets = await BrowserWallet.getAvailableWallets();
+        setAvailableWallets(wallets.map((w) => w.name as WalletName));
+      } catch (e) {
+        console.error("Failed to detect wallets:", e);
+      }
+    })();
+  }, []);
+
+  // Restore session
+  useEffect(() => {
+    const session = getSession();
+    if (session && isSessionValid()) {
+      setAuthState((prev) => ({
+        ...prev,
+        isAuthenticated: true,
+        step: "authenticated",
+      }));
+    }
+  }, []);
+
+  const connectWallet = useCallback(async (walletName: WalletName) => {
+    setError(null);
+    setLoading(true);
+    try {
+      // 1) Enable wallet
+      const api = await BrowserWallet.enable(walletName);
+      setWalletAPI(api);
+
+      // 2) Get address (bech32)
+      let addresses = await api.getUsedAddresses();
+      if (!addresses || addresses.length === 0) {
+        const change = await api.getChangeAddress();
+        addresses = change ? [change] : [];
+      }
+      if (addresses.length === 0) {
+        throw new Error("No address found in wallet");
+      }
+      const bech32Address = addresses[0];
+
+      // 3) Get network and balance
+      const networkId = await api.getNetworkId();
+      const lovelace = await api.getLovelace();
+      const balanceAda = formatAda(lovelace);
+
+      const connection: WalletConnection = {
+        name: walletName,
+        address: bech32Address,
+        balance: balanceAda,
+        networkId,
+        isConnected: true,
+      };
+
+      setWallet(connection);
+      setAuthState((prev) => ({ ...prev, step: "connected" }));
+      localStorage.setItem("connectedWallet", walletName);
+      return connection;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to connect wallet";
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const authenticate = useCallback(async () => {
+    if (!walletAPI || !wallet?.address) {
+      setError("Wallet not connected");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setAuthState((prev) => ({ ...prev, step: "signing" }));
+
+    try {
+      // 1) Request challenge from backend
+      const challengeResult = await requestChallenge(wallet.address, wallet.name);
+      const { message, nonce, externalAad } = challengeResult.data;
+
+      // 2) Get reward/stake addresses (returns bech32 format: "stake1...")
+      const rewardAddresses = await walletAPI.getRewardAddresses();
+      if (!rewardAddresses || rewardAddresses.length === 0) {
+        throw new Error("No reward address found in wallet");
+      }
+      
+      const stakeAddress = rewardAddresses[0]; 
+      const signResult = await walletAPI.signData(message, stakeAddress);
+
+      // 4) Verify with backend
+      const verifyDataResult = await verifySignature({
+        walletAddress: wallet.address,
+        nonce,
+        coseSign1: signResult.signature,
+        externalAad: externalAad || "",
+        publicKey: signResult.key,
+        walletType: wallet.name.toUpperCase(),
+      });
+
+      const { accessToken, user } = verifyDataResult.data;
+
+      // 5) Save session
+      const session = createSession(wallet.address, wallet.name);
+      saveSession(session);
+
+      // 6) Update auth state
+      setAuthState({
+        isAuthenticated: true,
+        user: user ?? { id: wallet.address, newAccount: false },
+        accessToken,
+        step: "authenticated",
+      });
+
+      return { accessToken, address: wallet.address, walletName: wallet.name };
+    } catch (err) {
+      console.error("Authentication error:", err);
+      setError(err instanceof Error ? err.message : "Authentication failed");
+      // Return to connected state so user can retry
+      setAuthState((prev) => ({ 
+        ...prev, 
+        isAuthenticated: false, 
+        step: "connected" 
+      }));
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [walletAPI, wallet]);
+
+  const disconnectWallet = useCallback(() => {
+    setError(null);
+    setWallet(null);
+    setWalletAPI(null);
+    setAuthState({
+      isAuthenticated: false,
+      user: null,
+      accessToken: null,
+      step: "select",
+    });
+    clearSession();
+    localStorage.removeItem("connectedWallet");
+  }, []);
+
+  const getBalance = useCallback(async () => {
+    if (!walletAPI) throw new Error("Wallet not connected");
+    const lovelace = await walletAPI.getLovelace();
+    return formatAda(lovelace);
+  }, [walletAPI]);
+
+  const signTransaction = useCallback(
+    async (txCborHex: string) => {
+      if (!walletAPI) throw new Error("Wallet not connected");
+      return await walletAPI.signTx(txCborHex);
+    },
+    [walletAPI]
+  );
+
+  const submitTransaction = useCallback(
+    async (signedTxCborHex: string) => {
+      if (!walletAPI) throw new Error("Wallet not connected");
+      return await walletAPI.submitTx(signedTxCborHex);
+    },
+    [walletAPI]
+  );
+
+  return {
+    wallet,
+    walletAPI,
+    availableWallets,
+    loading,
+    error,
+    connectWallet,
+    disconnectWallet,
+    authenticate,
+    getBalance,
+    signTransaction,
+    submitTransaction,
+    // Auth state
+    isAuthenticated: authState.isAuthenticated,
+    user: authState.user,
+    accessToken: authState.accessToken,
+    authStep: authState.step,
+  };
+};
