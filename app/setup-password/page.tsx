@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Spinner } from '@/components/ui/spinner';
+import { Checkbox } from '@/components/ui/checkbox';
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 export default function SetupPasswordPage() {
   const router = useRouter();
@@ -20,6 +22,8 @@ export default function SetupPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [mnemonic, setMnemonic] = useState<string | null>(null);
+  const [hasSavedToFile, setHasSavedToFile] = useState(false);
+  const [showWarningDialog, setShowWarningDialog] = useState(false);
 
   // Redirect nếu chưa authenticated
   useEffect(() => {
@@ -29,11 +33,12 @@ export default function SetupPasswordPage() {
   }, [isInitialized, isAuthenticated, router]);
 
   // Nếu keys đã được unlock (không cần password nữa), redirect đến job page
+  // Nhưng không redirect nếu đang hiển thị mnemonic để user có thể lưu nó
   useEffect(() => {
-    if (isInitialized && isAuthenticated && keyExists && !isLocked) {
+    if (isInitialized && isAuthenticated && keyExists && !isLocked && !showMnemonic) {
       router.push('/job');
     }
-  }, [isInitialized, isAuthenticated, keyExists, isLocked, router]);
+  }, [isInitialized, isAuthenticated, keyExists, isLocked, showMnemonic, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,13 +61,16 @@ export default function SetupPasswordPage() {
     try {
       if (!keyExists) {
         // Tạo keys mới
+        // Set showMnemonic = true trước để tránh useEffect redirect ngay lập tức
+        setShowMnemonic(true);
         const result = await createKeys(password);
         if (result.success) {
           setMnemonic(result.mnemonic || null);
-          setShowMnemonic(true);
+          setShowWarningDialog(true);
           // Đợi user xác nhận đã lưu mnemonic trước khi redirect
         } else {
           setError(result.message);
+          setShowMnemonic(false); // Reset nếu thất bại
         }
       } else {
         // Unlock keys đã tồn tại
@@ -82,8 +90,26 @@ export default function SetupPasswordPage() {
   };
 
   const handleContinueAfterMnemonic = () => {
+    if (!hasSavedToFile) {
+      setError('Please confirm that you have saved the mnemonic phrase to a text file');
+      return;
+    }
     setShowMnemonic(false);
+    setHasSavedToFile(false);
     router.push('/job');
+  };
+
+  const handleDownloadMnemonic = () => {
+    if (!mnemonic) return;
+    const blob = new Blob([mnemonic], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mnemonic-backup-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // Hiển thị loading khi chưa initialized
@@ -103,46 +129,122 @@ export default function SetupPasswordPage() {
   // Hiển thị mnemonic nếu vừa tạo keys mới
   if (showMnemonic && mnemonic) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 flex items-center justify-center px-4 py-12">
-        <Card className="w-full max-w-2xl">
-          <CardHeader>
-            <CardTitle>🔑 Save Your Recovery Phrase</CardTitle>
-            <CardDescription>
-              Please write down this mnemonic phrase and keep it safe. If you lose it, you will never be able to decrypt your messages.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert>
-              <AlertDescription>
-                ⚠️ This is the only time you will see this phrase. Make sure to save it securely.
-              </AlertDescription>
-            </Alert>
-            <div className="p-4 bg-muted rounded-lg border-2 border-dashed border-primary/20">
-              <p className="font-mono text-sm leading-relaxed text-center break-words">
-                {mnemonic}
-              </p>
-            </div>
-            <div className="flex gap-3">
+      <>
+        <AlertDialog open={showWarningDialog} onOpenChange={setShowWarningDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>⚠️ Important Warning</AlertDialogTitle>
+              <AlertDialogDescription className="space-y-3">
+                <p className="font-semibold text-destructive">
+                  You MUST save your mnemonic phrase to a text file for backup!
+                </p>
+                <p>
+                  This mnemonic phrase is your only way to recover your encryption keys.
+                  If you lose it, you will NEVER be able to decrypt your messages.
+                </p>
+                <p>
+                  <strong>Action required:</strong> Download the mnemonic phrase as a text file
+                  and store it in a safe location (USB drive, encrypted folder, or physical backup).
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  This is the ONLY time you will see this phrase. Make sure to save it securely before continuing.
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex justify-end gap-2 mt-4">
               <Button
                 variant="outline"
                 onClick={() => {
-                  navigator.clipboard.writeText(mnemonic);
-                  alert('Mnemonic copied to clipboard!');
+                  handleDownloadMnemonic();
+                  setShowWarningDialog(false);
                 }}
-                className="flex-1"
               >
-                Copy to Clipboard
+                Download as TXT File
               </Button>
               <Button
-                onClick={handleContinueAfterMnemonic}
-                className="flex-1"
+                onClick={() => setShowWarningDialog(false)}
               >
-                I've Saved It, Continue
+                I Understand
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 flex items-center justify-center px-4 py-12">
+          <Card className="w-full max-w-2xl">
+            <CardHeader>
+              <CardTitle>🔑 Save Your Recovery Phrase</CardTitle>
+              <CardDescription>
+                Please write down this mnemonic phrase and keep it safe. If you lose it, you will never be able to decrypt your messages.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert variant="destructive">
+                <AlertDescription>
+                  ⚠️ <strong>WARNING:</strong> This is the only time you will see this phrase. You MUST save it to a text file for backup!
+                </AlertDescription>
+              </Alert>
+              <div className="p-4 bg-muted rounded-lg border-2 border-dashed border-primary/20">
+                <p className="font-mono text-sm leading-relaxed text-center break-words">
+                  {mnemonic}
+                </p>
+              </div>
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(mnemonic);
+                      alert('Mnemonic copied to clipboard!');
+                    }}
+                    className="flex-1"
+                  >
+                    Copy to Clipboard
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleDownloadMnemonic}
+                    className="flex-1"
+                  >
+                    Download as TXT File
+                  </Button>
+                </div>
+                <div className="flex items-start space-x-2 p-3 bg-muted rounded-lg border">
+                  <Checkbox
+                    id="saved-to-file"
+                    checked={hasSavedToFile}
+                    onCheckedChange={(checked) => {
+                      setHasSavedToFile(checked === true);
+                      if (checked && error) {
+                        setError(null);
+                      }
+                    }}
+                    className="mt-1"
+                  />
+                  <label
+                    htmlFor="saved-to-file"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    I confirm that I have saved the mnemonic phrase to a text file and stored it securely
+                  </label>
+                </div>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                <Button
+                  onClick={handleContinueAfterMnemonic}
+                  disabled={!hasSavedToFile}
+                  className="w-full"
+                >
+                  I've Saved It, Continue
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </>
     );
   }
 
