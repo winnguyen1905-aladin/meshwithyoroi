@@ -1,23 +1,31 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useJobs } from '@/hooks/use-job';
+import { useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
+import { useJobs } from '@/hooks/use-job';
+import type { Job } from '@/app/api/job/jobService';
 
 export default function JobPage() {
   const router = useRouter();
   const { wallet, isAuthenticated } = useAuth();
   
-  // Sử dụng React Query hook
-  const {
-    data: jobsResponse,
-    isLoading,
-    error,
-  } = useJobs({
-    address: wallet?.address,
-  });
-
-  const jobs = jobsResponse?.data || [];
+  // Sử dụng hook để lấy jobs với address của wallet hiện tại (nếu có)
+  const { data: jobsResponse, isLoading } = useJobs(
+    wallet?.address ? { address: wallet.address } : undefined
+  );
+  
+  // Xử lý và sắp xếp jobs
+  const jobs = useMemo(() => {
+    const jobList = jobsResponse?.data || [];
+    
+    // Sắp xếp theo thời gian cập nhật gần nhất (recent first)
+    return jobList.sort((a, b) => {
+      const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+      const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+      return dateB - dateA;
+    });
+  }, [jobsResponse]);
 
   const handleJobClick = (jobId: string) => {
     router.push(`/job/${jobId}`);
@@ -69,25 +77,18 @@ export default function JobPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Jobs</h1>
-        <p className="text-gray-600">Manage your contracts with Aladin and Genie</p>
+        <h1 className="text-3xl font-bold mb-2">Recent Conversations</h1>
+        <p className="text-gray-600">Your recent job conversations</p>
       </div>
 
       {isLoading ? (
-        <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-          <p className="mt-4 text-gray-600">Loading jobs...</p>
-        </div>
-      ) : error ? (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-800">
-            {error instanceof Error ? error.message : 'Failed to load jobs'}
-          </p>
+        <div className="text-center py-12 bg-gray-50 rounded-lg">
+          <p className="text-gray-600">Loading conversations...</p>
         </div>
       ) : jobs.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <p className="text-gray-600 mb-4">No jobs found</p>
-          <p className="text-sm text-gray-500">Create a new job to get started</p>
+          <p className="text-gray-600 mb-4">No recent conversations</p>
+          <p className="text-sm text-gray-500">Start a new conversation to see it here</p>
         </div>
       ) : (
         <div className="space-y-4">

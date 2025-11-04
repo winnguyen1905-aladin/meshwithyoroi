@@ -21,7 +21,8 @@ export function useJobs(params?: {
   return useQuery({
     queryKey: ['jobs', params],
     queryFn: () => getJobs(params),
-    enabled: !!params?.address, // Chỉ fetch khi có address
+    // Cho phép fetch cả khi không có address (để lấy tất cả jobs)
+    staleTime: 30000, // Cache 30 giây
   });
 }
 
