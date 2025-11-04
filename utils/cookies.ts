@@ -1,53 +1,74 @@
 /**
- * Cookie utility functions for managing authentication tokens
+ * Cookie utils for access token (client-side only)
  */
 
-const ACCESS_TOKEN_COOKIE_NAME = 'accessToken';
-const ACCESS_TOKEN_COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days in seconds
+const ACCESS_TOKEN_COOKIE = "accessToken";
+const ACCESS_TOKEN_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+const isBrowser = typeof document !== "undefined";
 
-/**
- * Set access token in cookie
- */
-export function setAccessTokenCookie(token: string): void {
-  if (typeof window === 'undefined') return;
-  
-  // Set cookie with secure, httpOnly-like flags (httpOnly can't be set from client-side)
-  // Using SameSite=Strict for better security
-  const expires = new Date();
-  expires.setTime(expires.getTime() + ACCESS_TOKEN_COOKIE_MAX_AGE * 1000);
-  
-  document.cookie = `${ACCESS_TOKEN_COOKIE_NAME}=${token}; path=/; max-age=${ACCESS_TOKEN_COOKIE_MAX_AGE}; SameSite=Strict${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`;
+type SameSite = "Strict" | "Lax" | "None";
+
+function buildCookie(
+  name: string,
+  value: string,
+  opts: {
+    maxAge?: number;
+    expires?: Date;
+    path?: string;
+    domain?: string;
+    sameSite?: SameSite;
+    secure?: boolean;
+  } = {}
+) {
+  const parts = [
+    `${encodeURIComponent(name)}=${encodeURIComponent(value)}`,
+    `Path=${opts.path ?? "/"}`,
+  ];
+  if (opts.domain) parts.push(`Domain=${opts.domain}`);
+  if (opts.maxAge !== undefined) parts.push(`Max-Age=${Math.max(0, opts.maxAge | 0)}`);
+  if (opts.expires) parts.push(`Expires=${opts.expires.toUTCString()}`);
+  const sameSite = opts.sameSite ?? "Lax";
+  parts.push(`SameSite=${sameSite}`);
+  const secure = opts.secure ?? (sameSite === "None" || process.env.NODE_ENV === "production");
+  if (secure) parts.push("Secure");
+  return parts.join("; ");
 }
 
-/**
- * Get access token from cookie
- */
+/** Set access token cookie */
+export function setAccessTokenCookie(token: string): void {
+  if (!isBrowser) return;
+  document.cookie = buildCookie(ACCESS_TOKEN_COOKIE, token, {
+    maxAge: ACCESS_TOKEN_MAX_AGE,
+    // also set Expires for older agents
+    expires: new Date(Date.now() + ACCESS_TOKEN_MAX_AGE * 1000),
+    sameSite: "Lax", // use "Strict" if you don't do OAuth/third-party redirects
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  });
+}
+
+/** Get access token cookie */
 export function getAccessTokenCookie(): string | null {
-  if (typeof window === 'undefined') return null;
-  
-  const name = ACCESS_TOKEN_COOKIE_NAME + '=';
-  const decodedCookie = decodeURIComponent(document.cookie);
-  const cookieArray = decodedCookie.split(';');
-  
-  for (let i = 0; i < cookieArray.length; i++) {
-    let cookie = cookieArray[i];
-    while (cookie.charAt(0) === ' ') {
-      cookie = cookie.substring(1);
-    }
-    if (cookie.indexOf(name) === 0) {
-      return cookie.substring(name.length, cookie.length);
+  if (!isBrowser) return null;
+  if (!document.cookie) return null;
+  const pairs = document.cookie.split(/; */);
+  for (const pair of pairs) {
+    const [rawName, ...rest] = pair.split("=");
+    if (decodeURIComponent(rawName.trim()) === ACCESS_TOKEN_COOKIE) {
+      return decodeURIComponent(rest.join("="));
     }
   }
-  
   return null;
 }
 
-/**
- * Remove access token cookie
- */
+/** Remove access token cookie */
 export function removeAccessTokenCookie(): void {
-  if (typeof window === 'undefined') return;
-  
-  document.cookie = `${ACCESS_TOKEN_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict`;
+  if (!isBrowser) return;
+  document.cookie = buildCookie(ACCESS_TOKEN_COOKIE, "", {
+    maxAge: 0,
+    expires: new Date(0),
+    sameSite: "Lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  });
 }
-

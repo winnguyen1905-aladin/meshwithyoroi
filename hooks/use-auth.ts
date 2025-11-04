@@ -18,7 +18,6 @@ const formatAda = (lovelace: string) => {
 
 interface AuthState {
   isAuthenticated: boolean;
-  user: { id: string; newAccount: boolean } | null;
   accessToken: string | null;
   step: 'select' | 'connected' | 'signing' | 'authenticated';
 }
@@ -28,9 +27,9 @@ export const useAuth = () => {
   const [isInitialized, setIsInitialized] = useState(false); // ✅ Track initialization
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const [authState, setAuthState] = useState<AuthState>({
     isAuthenticated: false,
-    user: null,
     accessToken: null,
     step: 'select',
   });
@@ -144,10 +143,8 @@ export const useAuth = () => {
 
       const session = createSession(wallet.address, wallet.name);
       saveSession(session);
-
       setAuthState({
         isAuthenticated: true,
-        user: { id: wallet.address, newAccount: false },
         accessToken,
         step: 'authenticated',
       });
@@ -173,7 +170,6 @@ export const useAuth = () => {
     setWalletAPI(null);
     setAuthState({
       isAuthenticated: false,
-      user: null,
       accessToken: null,
       step: 'select',
     });
@@ -186,7 +182,6 @@ export const useAuth = () => {
     wallet,
     availableWallets,
     isAuthenticated: authState.isAuthenticated,
-    user: authState.user,
     accessToken: authState.accessToken,
     authStep: authState.step,
     connectWallet,

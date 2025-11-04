@@ -11,9 +11,10 @@ import { Spinner } from "@/components/ui/spinner";
 
 import { WalletName } from "@/types/cardano.types";
 import { useAuth } from "@/hooks/use-auth";
+import { useChatKey } from "@/context/chatkey-context";
 
 export default function LoginPage() {
-  const wallet = useAuth();  
+  const wallet = useAuth();   
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState<WalletName | null>(null);
@@ -275,7 +276,7 @@ export default function LoginPage() {
             )}
 
             {/* Step 4: Authenticated */}
-            {wallet.authStep === "authenticated" && wallet.user && (
+            {wallet.authStep === "authenticated" && wallet.wallet && (
               <div className="text-center space-y-6">
                 <div className="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center">
                   <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -284,7 +285,7 @@ export default function LoginPage() {
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold">Authentication Successful!</h2>
-                  {wallet.user.newAccount && (
+                  {wallet.wallet?.address && (
                     <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
                       ✨ New Account Created
                     </div>
@@ -294,7 +295,7 @@ export default function LoginPage() {
                 <div className="p-4 rounded-lg bg-muted/50 border border-border space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-muted-foreground">User ID:</span>
-                    <span className="text-sm font-mono">{truncateAddress(wallet.user.id)}</span>
+                    <span className="text-sm font-mono">{truncateAddress(wallet.wallet.address)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-muted-foreground">Wallet:</span>
