@@ -2,25 +2,28 @@ import { api } from '../apiClient';
 
 export interface Job {
   id: string;
-  jobId: string;
-  aladinAddress: string;
-  genieAddress: string;
-  status: 'active' | 'completed' | 'cancelled';
-  createdAt: string;
-  updatedAt: string;
-  contractAddress?: string;
+  aladinId: string;
+  genieId: string;
+  title: string;
+  description: string;
+  status: 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  onchainAddress: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CreateJobRequest {
-  aladinAddress: string;
-  genieAddress: string;
-  contractAddress?: string;
+  aladinId: string;
+  genieId: string;
+  title: string;
+  description: string;
 }
 
 export interface JobResponse {
-  success: boolean;
   data: Job;
-  message?: string;
+  message: string;
+  statusCode: number;
+  timestamp: string;
 }
 
 export interface JobListResponse {
@@ -63,7 +66,7 @@ export const getJob = async (jobId: string) => {
  * @param {CreateJobRequest} payload - Thông tin job
  */
 export const createJob = async (payload: CreateJobRequest) => {
-  const { data } = await api.post('/job', payload);
+  const { data } = await api.post('/jobs', payload);
   return data as JobResponse;
 };
 

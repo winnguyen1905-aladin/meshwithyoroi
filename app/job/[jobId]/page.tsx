@@ -103,7 +103,7 @@ export default function JobDetailPage() {
         </button>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Job #{job.jobId}</h1>
+            <h1 className="text-3xl font-bold mb-2">Job #{job.id}</h1>
             <p className="text-gray-600">Job Details</p>
           </div>
           {getStatusBadge(job.status)}
@@ -116,20 +116,20 @@ export default function JobDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="border border-gray-200 rounded-lg p-4">
               <h3 className="font-medium text-gray-700 mb-2">Aladin Address</h3>
-              <p className="font-mono text-sm break-all">{job.aladinAddress}</p>
+              <p className="font-mono text-sm break-all">{job.aladinId}</p>
             </div>
             <div className="border border-gray-200 rounded-lg p-4">
               <h3 className="font-medium text-gray-700 mb-2">Genie Address</h3>
-              <p className="font-mono text-sm break-all">{job.genieAddress}</p>
+              <p className="font-mono text-sm break-all">{job.genieId}</p>
             </div>
           </div>
         </div>
 
-        {job.contractAddress && (
+        {job.onchainAddress && (
           <div>
             <h2 className="text-lg font-semibold mb-2">Contract</h2>
             <div className="border border-gray-200 rounded-lg p-4">
-              <p className="font-mono text-sm break-all">{job.contractAddress}</p>
+              <p className="font-mono text-sm break-all">{job.onchainAddress}</p>
             </div>
           </div>
         )}
@@ -139,12 +139,12 @@ export default function JobDetailPage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-600">Created:</span>
-              <span className="font-medium">{formatDate(job.createdAt)}</span>
+              <span className="font-medium">{formatDate(job.createdAt || '')}</span>
             </div>
             {job.updatedAt !== job.createdAt && (
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">Last Updated:</span>
-                <span className="font-medium">{formatDate(job.updatedAt)}</span>
+                <span className="font-medium">{formatDate(job.updatedAt || '')}</span>
               </div>
             )}
           </div>

@@ -52,7 +52,7 @@ export function useCreateJob() {
       // Invalidate và refetch danh sách jobs
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       // Thêm job mới vào cache nếu có jobId
-      if (data.success && data.data) {
+      if (data.data && data.data.id) {
         queryClient.setQueryData(['job', data.data.id], data);
       }
     },
@@ -77,7 +77,7 @@ export function useUpdateJob() {
       queryClient.invalidateQueries({ queryKey: ['job', variables.jobId] });
       
       // Cập nhật cache trực tiếp nếu có
-      if (data.success && data.data) {
+      if (data.data) {
         queryClient.setQueryData(['job', variables.jobId], data);
       }
     },
@@ -133,7 +133,7 @@ export function useJobOperations() {
     const jobsData = queryClient.getQueryData<{ data: Job[] }>(['jobs']);
     if (!jobsData?.data) return [];
     return jobsData.data.filter(
-      (job) => job.aladinAddress === address || job.genieAddress === address
+      (job) => job.aladinId === address || job.genieId === address
     );
   };
   
