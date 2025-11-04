@@ -8,10 +8,6 @@ interface ChallengeData {
 
 interface VerifyData {
   accessToken: string
-  user: {
-    id: string
-    newAccount: boolean
-  }
 }
 
 export const requestChallenge = async (address: string, walletType: string) => {
@@ -31,5 +27,10 @@ export const verifySignature = async (payload: {
   walletType: string
 }) => {
   const res = await api.post('/auth/verify', payload);
-  return res.data as { success: boolean; data: VerifyData; message?: string };
+  return res.data as { 
+    data: VerifyData
+    message: string
+    statusCode: number
+    timestamp: string
+  };
 }

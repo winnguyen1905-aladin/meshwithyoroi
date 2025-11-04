@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { SUPPORTED_WALLETS } from "@/lib/wallet-utils"
+import { SUPPORTED_WALLETS } from "@/utils/wallet-utils"
 import { WalletName } from "@/types/cardano.types"
 
 interface WalletSelectorProps {

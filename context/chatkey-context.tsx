@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import * as bip39 from 'bip39';
 import { derivePath, getPublicKey } from 'ed25519-hd-key';
 import { E2EE_PATH } from '@/lib/constants';
-import { encryptKey, decryptKey } from '@/lib/e2ee-utils';
+import { encryptKey, decryptKey } from '@/utils/e2ee-utils';
 
 const STORAGE_KEYS = {
   SESSION_KEY: 'session_key',

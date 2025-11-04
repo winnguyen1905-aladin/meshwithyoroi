@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getSession, createSession, saveSession, clearSession, isSessionValid } from '@/lib/session';
 import { requestChallenge, verifySignature } from '@/app/api/auth/authService';
+import { setAccessTokenCookie, getAccessTokenCookie, removeAccessTokenCookie } from '@/utils/cookies';
 import type { WalletName, WalletConnection } from '@/types/cardano.types';
 import { useWalletContext } from '@/context/wallet-context';
 
@@ -38,11 +39,13 @@ export const useAuth = () => {
   useEffect(() => {
     const initAuth = () => {
       const session = getSession();
+      const accessToken = getAccessTokenCookie();
       
-      if (session && isSessionValid()) {
+      if (session && isSessionValid() && accessToken) {
         setAuthState((prev) => ({
           ...prev,
           isAuthenticated: true,
+          accessToken,
           step: 'authenticated',
         }));
       }
@@ -134,14 +137,17 @@ export const useAuth = () => {
         walletType: wallet.name.toUpperCase(),
       });
 
-      const { accessToken, user } = verifyDataResult.data;
+      const { accessToken } = verifyDataResult.data;
+
+      // Save accessToken to cookie
+      setAccessTokenCookie(accessToken);
 
       const session = createSession(wallet.address, wallet.name);
       saveSession(session);
 
       setAuthState({
         isAuthenticated: true,
-        user: user ?? { id: wallet.address, newAccount: false },
+        user: { id: wallet.address, newAccount: false },
         accessToken,
         step: 'authenticated',
       });
@@ -172,6 +178,7 @@ export const useAuth = () => {
       step: 'select',
     });
     clearSession();
+    removeAccessTokenCookie();
     localStorage.removeItem('connectedWallet');
   }, [setWallet, setWalletAPI]);
 

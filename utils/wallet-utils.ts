@@ -1,4 +1,4 @@
-import { WalletName } from "../types/cardano.types"
+import { WalletName } from "@/types/cardano.types"
 
 // Utility functions for wallet detection and interaction
 export const SUPPORTED_WALLETS = {
@@ -89,3 +89,4 @@ export const formatLovelace = (lovelace: string | number): string => {
 export const toLovelace = (ada: number): string => {
   return (ada * 1_000_000).toString()
 }
+
