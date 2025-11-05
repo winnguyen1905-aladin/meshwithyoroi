@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
   SESSION_KEY: 'session_key',
   CHAT_KEY_BLOB: 'chat_key_blob',
 } as const;
+
 const MIN_PASSWORD_LENGTH = 8;
 
 interface ChatKeyContextValue {
@@ -16,8 +17,8 @@ interface ChatKeyContextValue {
   isLocked: boolean;
   keyExists: boolean;
   error: string | null;
-  unLockKeys: (localPassword: string) => Promise<{ success: boolean; message: string }>;
   lockKeys: () => Promise<{ success: boolean; message: string }>;
+  unLockKeys: (localPassword: string) => Promise<{ success: boolean; message: string }>;
   createKeys: (localPassword: string) => Promise<{ success: boolean; mnemonic?: string; message: string }>;
 }
 

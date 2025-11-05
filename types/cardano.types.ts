@@ -57,12 +57,12 @@ export interface AddressOption {
   balance?: number
   hasUtxos: boolean
 }
-
+ 
 declare global {
   interface Window {
-    cardano?: {
-      [key: string]: CardanoWallet
-    }
+    // cardano?: {
+    //   [key: string]: CardanoWallet
+    // }
     mesh?: {
       [key: string]: BrowserWallet
     }

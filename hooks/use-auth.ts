@@ -20,6 +20,7 @@ interface AuthState {
   isAuthenticated: boolean;
   accessToken: string | null;
   step: 'select' | 'connected' | 'signing' | 'authenticated';
+  stakeAddress: string | null;
 }
 
 export const useAuth = () => {
@@ -32,6 +33,7 @@ export const useAuth = () => {
     isAuthenticated: false,
     accessToken: null,
     step: 'select',
+    stakeAddress: null,
   });
 
   // Restore session on mount
@@ -54,6 +56,65 @@ export const useAuth = () => {
 
     initAuth();
   }, []);
+
+  // Hydrate stake address when walletAPI is available but stakeAddress is missing
+  useEffect(() => {
+    if (!walletAPI || authState.stakeAddress) return;
+    (async () => {
+      try {
+        const rewardAddresses = await walletAPI.getRewardAddresses();
+        const stakeAddr = rewardAddresses && rewardAddresses.length > 0 ? rewardAddresses[0] : null;
+        if (stakeAddr) {
+          setAuthState((prev) => ({ ...prev, stakeAddress: stakeAddr }));
+        }
+      } catch (e) {
+        // ignore silently; will be set during connect/authenticate
+      }
+    })();
+  }, [walletAPI, authState.stakeAddress]);
+
+  // Auto-reconnect previously connected wallet and hydrate wallet + stakeAddress
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (walletAPI || wallet) return;
+    const savedWalletName = localStorage.getItem('connectedWallet') as WalletName | null;
+    if (!savedWalletName) return;
+    (async () => {
+      try {
+        const { BrowserWallet } = await import('@meshsdk/core');
+        const api = await BrowserWallet.enable(savedWalletName);
+        setWalletAPI(api);
+
+        let addresses = await api.getUsedAddresses();
+        if (!addresses || addresses.length === 0) {
+          const change = await api.getChangeAddress();
+          addresses = change ? [change] : [];
+        }
+        if (addresses.length === 0) return; // cannot hydrate
+
+        const bech32Address = addresses[0];
+        const networkId = await api.getNetworkId();
+        const lovelace = await api.getLovelace();
+        const rewardAddresses = await api.getRewardAddresses();
+        const stakeAddr = rewardAddresses && rewardAddresses.length > 0 ? rewardAddresses[0] : null;
+        const balanceAda = formatAda(lovelace);
+
+        const connection: WalletConnection = {
+          name: savedWalletName,
+          address: bech32Address,
+          balance: balanceAda,
+          networkId,
+          isConnected: true,
+        };
+
+        setWallet(connection);
+        setAuthState((prev) => ({ ...prev, step: 'connected', stakeAddress: stakeAddr }));
+      } catch (e) {
+        // if auto-reconnect fails, clear saved hint
+        try { localStorage.removeItem('connectedWallet'); } catch {}
+      }
+    })();
+  }, [walletAPI, wallet, setWalletAPI, setWallet]);
 
   // Connect wallet
   const connectWallet = useCallback(
@@ -79,6 +140,8 @@ export const useAuth = () => {
 
         const networkId = await api.getNetworkId();
         const lovelace = await api.getLovelace();
+        const rewardAddresses = await api.getRewardAddresses();
+        const stakeAddress = rewardAddresses && rewardAddresses.length > 0 ? rewardAddresses[0] : null;
         const balanceAda = formatAda(lovelace);
 
         const connection: WalletConnection = {
@@ -90,7 +153,7 @@ export const useAuth = () => {
         };
 
         setWallet(connection);
-        setAuthState((prev) => ({ ...prev, step: 'connected' }));
+        setAuthState((prev) => ({ ...prev, step: 'connected', stakeAddress }));
         localStorage.setItem('connectedWallet', walletName);
 
         return connection;
@@ -147,6 +210,7 @@ export const useAuth = () => {
         isAuthenticated: true,
         accessToken,
         step: 'authenticated',
+        stakeAddress,
       });
 
       return { accessToken, address: wallet.address, walletName: wallet.name };
@@ -172,6 +236,7 @@ export const useAuth = () => {
       isAuthenticated: false,
       accessToken: null,
       step: 'select',
+      stakeAddress: null,
     });
     clearSession();
     removeAccessTokenCookie();
@@ -183,6 +248,7 @@ export const useAuth = () => {
     availableWallets,
     isAuthenticated: authState.isAuthenticated,
     accessToken: authState.accessToken,
+    stakeAddress: authState.stakeAddress,
     authStep: authState.step,
     connectWallet,
     authenticate,

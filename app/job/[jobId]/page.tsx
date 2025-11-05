@@ -3,12 +3,25 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useJob } from '@/hooks/use-job';
 import { useAuth } from '@/hooks/use-auth';
+import { useEffect, useMemo } from 'react';
+import { JobsSidebar } from '@/components/chat/JobsSidebar';
+import { ChatHeader } from '@/components/chat/ChatHeader';
+import { MessageList } from '@/components/chat/MessageList';
+import { MessageComposer } from '@/components/chat/MessageComposer';
+import { useJoinJobRoom, useLeaveJobRoom, useResolvePeerPublicKey } from '@/hooks/use-chat';
+import { useJobMessagesInfinite, useMarkMessagesRead } from '@/hooks/use-job';
+import { useJobMessages } from '@/store/use-chat.store';
 
 export default function JobDetailPage() {
   const params = useParams();
   const router = useRouter();
   const jobId = params.jobId as string;
-  const { wallet, isAuthenticated } = useAuth();
+  const { wallet, isAuthenticated, stakeAddress } = useAuth();
+  const joinRoom = useJoinJobRoom();
+  const leaveRoom = useLeaveJobRoom();
+  const messages = useJobMessages(jobId);
+  const messagesInfinite = useJobMessagesInfinite(jobId);
+  const markReadMutation = useMarkMessagesRead();
   
   // Sử dụng React Query hook
   const {
@@ -18,6 +31,47 @@ export default function JobDetailPage() {
   } = useJob(jobId);
 
   const job = jobResponse?.data;
+
+  const canChat = useMemo(() => {
+    if (!stakeAddress || !job) return false;
+    return job.aladinId === stakeAddress || job.genieId === stakeAddress;
+  }, [stakeAddress, job]);
+
+  useEffect(() => {
+    
+    // expose current wallet for message self/right alignment
+    (window as any).currentWalletAddress = stakeAddress;
+  }, [stakeAddress]);
+
+  useEffect(() => {
+    if (!jobId) return;
+    joinRoom(jobId);
+    return () => leaveRoom(jobId);
+  }, [jobId, joinRoom, leaveRoom]);
+
+  // Auto-mark messages as read when viewing
+  useEffect(() => {
+    
+
+    if (!canChat || !jobId || !stakeAddress || messages.length === 0) return;
+    
+    // Get unread messages (messages not sent by current user)
+    const unreadMessageIds = messages
+      .filter(m => m.senderId !== stakeAddress && !m.metadata?.read)
+      .map(m => m.id)
+      .filter(Boolean) as string[];
+
+    // Mark as read with debounce (only once per batch)
+    if (unreadMessageIds.length > 0) {
+      const timer = setTimeout(() => {
+        markReadMutation.mutate({ jobId, messageIds: unreadMessageIds });
+      }, 1000); // 1 second debounce
+
+      return () => clearTimeout(timer);
+    }
+  }, [messages.length, canChat, jobId, stakeAddress, markReadMutation]);
+
+  const resolvePeerPublicKey = useResolvePeerPublicKey(jobId, job, stakeAddress || undefined);
 
   const formatDate = (dateString: string) => {
     try {
@@ -83,7 +137,7 @@ export default function JobDetailPage() {
           </p>
           <button
             onClick={() => router.push('/job')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer"
           >
             Back to Jobs
           </button>
@@ -94,60 +148,38 @@ export default function JobDetailPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
+      <div className="mb-4">
         <button
           onClick={() => router.back()}
-          className="text-blue-600 hover:text-blue-800 mb-4"
+          className="text-blue-600 hover:text-blue-800 cursor-pointer"
         >
           ← Back
         </button>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Job #{job.id}</h1>
-            <p className="text-gray-600">Job Details</p>
-          </div>
-          {getStatusBadge(job.status)}
-        </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
-        <div>
-          <h2 className="text-lg font-semibold mb-4">Participants</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="font-medium text-gray-700 mb-2">Aladin Address</h3>
-              <p className="font-mono text-sm break-all">{job.aladinId}</p>
-            </div>
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="font-medium text-gray-700 mb-2">Genie Address</h3>
-              <p className="font-mono text-sm break-all">{job.genieId}</p>
-            </div>
-          </div>
+      <div className="grid grid-cols-12 gap-4 h-[75vh]">
+        {/* Sidebar 35-40% */}
+        <div className="col-span-12 md:col-span-5 lg:col-span-4 xl:col-span-4 bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <JobsSidebar />
         </div>
 
-        {job.onchainAddress && (
-          <div>
-            <h2 className="text-lg font-semibold mb-2">Contract</h2>
-            <div className="border border-gray-200 rounded-lg p-4">
-              <p className="font-mono text-sm break-all">{job.onchainAddress}</p>
-            </div>
-          </div>
-        )}
-
-        <div>
-          <h2 className="text-lg font-semibold mb-2">Timeline</h2>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">Created:</span>
-              <span className="font-medium">{formatDate(job.createdAt || '')}</span>
-            </div>
-            {job.updatedAt !== job.createdAt && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Last Updated:</span>
-                <span className="font-medium">{formatDate(job.updatedAt || '')}</span>
-              </div>
-            )}
-          </div>
+        {/* Chat Panel 60-65% */}
+        <div className="col-span-12 md:col-span-7 lg:col-span-8 xl:col-span-8 bg-white rounded-lg border border-gray-200 flex flex-col overflow-hidden">
+          <ChatHeader title={job.title} status={job.status} />
+          {!canChat ? (
+            <div className="p-6 text-sm text-gray-600">Only participants can view and send messages for this job.</div>
+          ) : (
+            <>
+              <MessageList
+                jobId={jobId}
+                onLoadMore={() => messagesInfinite.fetchNextPage()}
+              />
+              <MessageComposer
+                jobId={jobId}
+                resolvePeerPublicKey={resolvePeerPublicKey}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

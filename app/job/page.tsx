@@ -13,15 +13,50 @@ export default function JobPage() {
   const router = useRouter();
   const { wallet, isAuthenticated } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [role, setRole] = useState<'aladin' | 'genie' | undefined>(undefined);
+  const [skip, setSkip] = useState<number>(0);
+  const [take, setTake] = useState<number>(10);
   
-  // Sử dụng hook để lấy jobs với address của wallet hiện tại (nếu có)
-  const { data: jobsResponse, isLoading, refetch } = useJobs(
-    wallet?.address ? { address: wallet.address } : undefined
-  );
+  // Build query params - only include valid values
+  const queryParams = useMemo(() => {
+    const params: {
+      address?: string;
+      role?: 'aladin' | 'genie';
+      skip?: number;
+      take?: number;
+    } = {};
+    
+    if (wallet?.address) {
+      params.address = wallet.address;
+    }
+    
+    if (role) {
+      params.role = role;
+    }
+    
+    // Only include skip if it's a valid number >= 0
+    const skipNum = Number(skip);
+    if (!isNaN(skipNum) && skipNum >= 0) {
+      params.skip = skipNum;
+    }
+    
+    // Only include take if it's a valid number > 0
+    const takeNum = Number(take);
+    if (!isNaN(takeNum) && takeNum > 0) {
+      params.take = takeNum;
+    }
+    
+    // Return undefined if no params to avoid unnecessary API calls
+    return Object.keys(params).length > 0 ? params : undefined;
+  }, [wallet?.address, role, skip, take]);
+  
+  // Sử dụng hook để lấy jobs với params đã được validate
+  const { data: jobsResponse, isLoading, refetch } = useJobs(queryParams);
   
   // Xử lý và sắp xếp jobs
   const jobs = useMemo(() => {
-    const jobList = jobsResponse?.data || [];
+    // Response structure: { data: { data: Job[], total, skip, take } }
+    const jobList = jobsResponse?.data?.data || [];
     
     // Sắp xếp theo thời gian cập nhật gần nhất (recent first)
     return jobList.sort((a, b) => {
@@ -30,6 +65,9 @@ export default function JobPage() {
       return dateB - dateA;
     });
   }, [jobsResponse]);
+  
+  // Get total count for pagination
+  const totalCount = jobsResponse?.data?.total || 0;
 
   const handleJobClick = (jobId: string) => {
     router.push(`/job/${jobId}`);
@@ -99,6 +137,103 @@ export default function JobPage() {
             <CreateJobForm onSuccess={handleCreateSuccess} onCancel={() => setIsCreateDialogOpen(false)} />
           </DialogContent>
         </Dialog>
+      </div>
+
+      {/* Filters and Pagination */}
+      <div className="mb-6 flex flex-wrap items-center gap-4 p-4 bg-gray-50 rounded-lg">
+        <div className="flex items-center gap-2">
+          <label htmlFor="role-filter" className="text-sm font-medium text-gray-700">
+            Role:
+          </label>
+          <select
+            id="role-filter"
+            value={role || ''}
+            onChange={(e) => {
+              setRole(e.target.value === '' ? undefined : e.target.value as 'aladin' | 'genie');
+              setSkip(0); // Reset pagination when filter changes
+            }}
+            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All</option>
+            <option value="aladin">Aladin</option>
+            <option value="genie">Genie</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label htmlFor="take-input" className="text-sm font-medium text-gray-700">
+            Per page:
+          </label>
+          <input
+            id="take-input"
+            type="number"
+            min="1"
+            max="100"
+            value={take}
+            onChange={(e) => {
+              const inputValue = e.target.value;
+              // Handle empty input - keep current value
+              if (inputValue === '') return;
+              
+              const value = parseInt(inputValue, 10);
+              // Only update if valid number and > 0
+              if (!isNaN(value) && isFinite(value) && value > 0 && value <= 100) {
+                setTake(value);
+                setSkip(0); // Reset to first page
+              }
+            }}
+            onBlur={(e) => {
+              // Ensure value is valid on blur
+              const value = parseInt(e.target.value, 10);
+              if (isNaN(value) || value <= 0 || value > 100) {
+                setTake(10); // Reset to default
+              }
+            }}
+            className="w-20 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 ml-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const skipNum = Number(skip);
+              const takeNum = Number(take);
+              if (!isNaN(skipNum) && !isNaN(takeNum) && takeNum > 0) {
+                setSkip(Math.max(0, skipNum - takeNum));
+              }
+            }}
+            disabled={skip === 0 || isLoading || isNaN(Number(skip)) || isNaN(Number(take))}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-gray-600">
+            Page {!isNaN(Number(skip)) && !isNaN(Number(take)) && Number(take) > 0 
+              ? Math.floor(Number(skip) / Number(take)) + 1 
+              : 1}{' '}
+            ({totalCount > 0 ? `${skip + 1}-${Math.min(skip + take, totalCount)} of ${totalCount}` : '0'} jobs)
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const skipNum = Number(skip);
+              const takeNum = Number(take);
+              if (!isNaN(skipNum) && !isNaN(takeNum) && takeNum > 0) {
+                setSkip(skipNum + takeNum);
+              }
+            }}
+            disabled={
+              isLoading || 
+              isNaN(Number(skip)) || 
+              isNaN(Number(take)) ||
+              (skip + take >= totalCount)
+            }
+          >
+            Next
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (

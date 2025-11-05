@@ -146,7 +146,13 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    scrollbar-gutter: stable;
+  }
   body {
     @apply bg-background text-foreground;
+    scrollbar-gutter: stable;
+    /* Prevent layout shift when scrollbar appears/disappears */
+    overflow-y: scroll;
   }
 }

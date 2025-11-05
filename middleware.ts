@@ -5,11 +5,12 @@ import { getSession } from "./lib/session"
  * Middleware for route protection and redirects
  */
 export function middleware(request: NextRequest) {
+  
   const { pathname } = request.nextUrl
 
   // Allow public routes
   // TODO: tạm export dashboard để test, sau này check login rồi mới public
-  const publicRoutes = ["/login", "/api", "/dashboard", "/job", "/setup-password"]
+  const publicRoutes = ["/login", "/api", "/dashboard", "/job", "/setup-password", "/introduction"]
   if (publicRoutes.some((route) => pathname.startsWith(route))) {
     return NextResponse.next()
   }
@@ -19,7 +20,7 @@ export function middleware(request: NextRequest) {
 
   // Redirect to login if no session
   if (!walletSession && pathname !== "/login") {
-    return NextResponse.redirect(new URL("/login", request.url))
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   return NextResponse.next()

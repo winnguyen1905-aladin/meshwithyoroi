@@ -17,14 +17,13 @@ interface WalletContextValue {
 const WalletContext = createContext<WalletContextValue | undefined>(undefined);
 
 export const WalletProvider = ({ children }: { children: ReactNode }) => {
-  const [wallet, setWallet] = useState<WalletConnection | null>(null);
   const [walletAPI, setWalletAPI] = useState<any | null>(null);
+  const [wallet, setWallet] = useState<WalletConnection | null>(null);
   const [availableWallets, setAvailableWallets] = useState<WalletName[]>([]);
 
   // Detect available wallets - chỉ chạy ở client-side
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
     (async () => {
       try {
         // Dynamic import để chỉ load ở client-side

@@ -46,6 +46,15 @@
       ],
       "@/contracts/*": [
         "./contracts/*"
+      ],
+      "@/socket/*": [
+        "./socket/*"
+      ],
+      "@/mediasoup/*": [
+        "./mediasoup/*"
+      ],
+      "@/utils/*": [
+        "./utils/*"
       ]
     }
   },
