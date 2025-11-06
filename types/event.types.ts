@@ -72,10 +72,13 @@ export interface ServerToClientEvents {
   
   // Normal Chat events (Server to Client)
   'contract:message.new': (data: MessagePayload) => void;
-  'chat:messageEdited': (data: MessageEditedData) => void;
-  'chat:messageDeleted': (data: MessageDeletedData) => void;
-  'chat:messagesRead': (data: MessagesReadData) => void;
-  'chat:typing': (data: TypingIndicatorData) => void; 
+  'contract:message.typed': () => void;
+  'contract:message.viewed': () => void;
+
+  // 'chat:messageEdited': (data: MessageEditedData) => void;
+  // 'chat:messageDeleted': (data: MessageDeletedData) => void;
+  // 'chat:messagesRead': (data: MessagesReadData) => void;
+  // 'chat:typing': (data: TypingIndicatorData) => void; 
 }
 
 export interface ClientToServerEvents {

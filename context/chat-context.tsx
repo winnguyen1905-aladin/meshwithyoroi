@@ -35,7 +35,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const { decodeMessage } = useChatE2ee();
   const { privateKey } = useChatKey();
   const queryClient = useQueryClient();
-  const { stakeAddress } = useAuth();
 
   useEffect(() => {
     const client = socketManager.getSocket(CHAT_NAMESPACE, {});
@@ -118,8 +117,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     client.on('disconnect', handleDisconnect);
     
     client.on('contract:message.new', handleNewMessage);
+    // client.on('contract:message.typed', () => {});
+    // client.on('contract:message.viewed', () => {}); 
     return () => {
-      console.log('disconnecting from chat');
       client.off('connect', handleConnect);
       client.off('disconnect', handleDisconnect);
       client.off('contract:message.new', handleNewMessage);

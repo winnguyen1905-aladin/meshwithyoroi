@@ -11,13 +11,13 @@ export const MessageList = ({
   jobId: string;
   onLoadMore?: () => void;
 }) => {
-  const listRef = useRef<HTMLDivElement | null>(null);
   const { stakeAddress } = useAuth();
   const messages = useJobMessages(jobId);
   const rafRef = useRef<number | null>(null);
   const previousJobIdRef = useRef<string>(jobId);
   const [isVisible, setIsVisible] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
   const scrollToBottom = (smooth: boolean = false) => {
     const sentinel = bottomRef.current;
@@ -56,8 +56,15 @@ export const MessageList = ({
   // Ensure scroll to bottom after fade-in when job changes
   useEffect(() => {
     if (!isVisible) return;
-    const t = setTimeout(() => scrollToBottom(false), 0);
-    return () => clearTimeout(t);
+    let raf1: number | null = null;
+    let raf2: number | null = null;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => scrollToBottom(false));
+    });
+    return () => {
+      if (raf1) cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+    };
   }, [isVisible, jobId]);
 
   const handleScroll = () => {
@@ -88,7 +95,7 @@ export const MessageList = ({
     <div 
       ref={listRef} 
       onScroll={handleScroll} 
-      className={`flex-1 overflow-y-auto p-4 space-y-2 transition-all duration-300 ease-in-out ${
+      className={`flex-1 overflow-y-auto p-4 space-y-2 transition-all duration-350 ease-in-out ${
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-[10px]'
       }`}
     >
@@ -97,6 +104,3 @@ export const MessageList = ({
     </div>
   );
 };
-
-
-

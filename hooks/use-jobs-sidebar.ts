@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useCallback, useEffect } from 'react';
+import { useMemo, useRef, useCallback, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
@@ -15,6 +15,7 @@ type UseJobsSidebarResult = {
   hasNextPage: boolean | undefined;
   isFetchingNextPage: boolean;
   currentJobId: string | undefined;
+  lastBumpedJobId: string | null;
 };
 
 export const useJobsSidebar = (): UseJobsSidebarResult => {
@@ -23,6 +24,7 @@ export const useJobsSidebar = (): UseJobsSidebarResult => {
   const { stakeAddress } = useAuth();
   const queryClient = useQueryClient();
   const currentJobId = pathname?.split('/job/')[1]?.split('/')[0];
+  const [lastBumpedJobId, setLastBumpedJobId] = useState<string | null>(null);
 
   const {
     data,
@@ -61,6 +63,7 @@ export const useJobsSidebar = (): UseJobsSidebarResult => {
       const jobId = data?.jobId;
       if (!jobId) return;
 
+      let didBump = false;
       const bumpJobInPages = (prev: any) => {
         if (!prev?.pages) return prev;
         const pages = prev.pages.map((page: any) => ({
@@ -82,10 +85,23 @@ export const useJobsSidebar = (): UseJobsSidebarResult => {
         const foundJob = pages[foundPageIdx].data.data[foundIndex];
         pages[foundPageIdx].data.data.splice(foundIndex, 1);
         pages[0].data.data.unshift({ ...foundJob });
+        didBump = true;
         return { ...prev, pages };
       };
 
       queryClient.setQueryData(['jobs-infinite', stakeAddress, 10], bumpJobInPages);
+
+      if (didBump) {
+        setLastBumpedJobId(jobId);
+        // Smooth scroll the container to top so movement is visible
+        const el = containerRef.current;
+        if (el) {
+          el.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        // Clear highlight after a short delay
+        const t = setTimeout(() => setLastBumpedJobId(null), 1200);
+        return () => clearTimeout(t);
+      }
     };
 
     client.on('contract:message.new', handleNewMessage);
@@ -102,5 +118,6 @@ export const useJobsSidebar = (): UseJobsSidebarResult => {
     hasNextPage,
     isFetchingNextPage,
     currentJobId,
+    lastBumpedJobId,
   };
 };
