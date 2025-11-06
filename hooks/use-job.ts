@@ -79,6 +79,42 @@ export function useJob(jobId: string | undefined) {
 }
 
 /**
+ * Infinite query for jobs by address, ordered by newest interaction (client-side fallback)
+ */
+export function useJobsInfinite(address: string | undefined, pageSize: number = 10) {
+  return useInfiniteQuery({
+    queryKey: ['jobs-infinite', address, pageSize],
+    initialPageParam: 0 as number,
+    queryFn: async ({ pageParam }) => {
+      if (!address) throw new Error('Address is required');
+      const skip = typeof pageParam === 'number' ? pageParam : 0;
+      const take = pageSize;
+      const res = await getJobs({ address, skip, take });
+      // Ensure client-side ordering by updatedAt desc if backend doesn't guarantee
+      if (Array.isArray(res?.data?.data)) {
+        res.data.data.sort((a: any, b: any) => {
+          const ta = new Date(a.updatedAt || a.createdAt || 0).getTime();
+          const tb = new Date(b.updatedAt || b.createdAt || 0).getTime();
+          return tb - ta;
+        });
+      }
+      return res;
+    },
+    getNextPageParam: (lastPage) => {
+      const payload: any = lastPage?.data;
+      if (!payload) return undefined;
+      const total: number = payload.total ?? 0;
+      const skip: number = payload.skip ?? 0;
+      const take: number = payload.take ?? pageSize;
+      const nextSkip = skip + take;
+      return nextSkip < total ? nextSkip : undefined;
+    },
+    enabled: !!address,
+    staleTime: 30000,
+  });
+}
+
+/**
  * Fetch conversations list for a wallet address
  */
 export function useConversations(address: string | undefined) {
@@ -154,7 +190,7 @@ export function useJobMessagesInfinite(jobId: string | undefined) {
             nonceBytes);
 
           const isDecrypted = !!plaintext;
-          const content = isDecrypted
+          const encryptedContent = isDecrypted
             ? new TextDecoder().decode(plaintext as Uint8Array)
             : '[Failed to decrypt]';
 
@@ -163,7 +199,7 @@ export function useJobMessagesInfinite(jobId: string | undefined) {
             senderId: message.senderId,
             jobId: message.jobId,
             nonce: message.nonce,
-            content,
+            encryptedContent: message.encryptedContent,
             timestamp: new Date(message.createdAt).getTime(),
             messageType: 'text',
             metadata: {
@@ -183,7 +219,7 @@ export function useJobMessagesInfinite(jobId: string | undefined) {
             senderId: message.senderId,
             jobId: message.jobId,
             nonce: message.nonce,
-            content: '[Decryption error]',
+            encryptedContent: '[Decryption error]',
             timestamp: new Date(message.createdAt).getTime(),
             messageType: 'text',
             metadata: {

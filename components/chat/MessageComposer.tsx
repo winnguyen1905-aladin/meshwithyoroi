@@ -7,19 +7,21 @@ export const MessageComposer = ({
   jobId,
   resolvePeerPublicKey,
   maxLength = 2000,
+  disabled = false,
 }: {
   jobId: string;
   resolvePeerPublicKey: () => Buffer;
   maxLength?: number;
+  disabled?: boolean;
 }) => {
-
+  
   const [value, setValue] = useState('');
   const [sending, setSending] = useState(false);
   const { sendText } = useSendChat(jobId, resolvePeerPublicKey);
 
   const doSend = async () => {
     const text = value.trim();
-    if (!text) return;
+    if (!text || disabled) return;
     setSending(true);
     try {
       await sendText(text);
@@ -42,17 +44,17 @@ export const MessageComposer = ({
         <textarea
           className="flex-1 resize-none rounded-md border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           rows={2}
-          placeholder="Type a message"
+          placeholder={ 'Type a message'}
           value={value}
           maxLength={maxLength}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={onKeyDown}
-          disabled={sending}
+          disabled={disabled || sending}
         />
         <button
           type="button"
           onClick={doSend}
-          disabled={sending || !value.trim()}
+          disabled={disabled || sending || !value.trim()}
           className="px-4 py-2 cursor-pointer rounded-md bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Send

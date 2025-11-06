@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getSession, createSession, saveSession, clearSession, isSessionValid } from '@/lib/session';
 import { requestChallenge, verifySignature } from '@/app/api/auth/authService';
 import { setAccessTokenCookie, getAccessTokenCookie, removeAccessTokenCookie } from '@/utils/cookies';
@@ -36,6 +36,22 @@ export const useAuth = () => {
     stakeAddress: null,
   });
 
+  // Minimize re-renders: shallow compare before committing state updates
+  const setAuth = useCallback((patch: Partial<AuthState>) => {
+    setAuthState((prev) => {
+      const next: AuthState = { ...prev, ...patch } as AuthState;
+      if (
+        prev.isAuthenticated === next.isAuthenticated &&
+        prev.accessToken === next.accessToken &&
+        prev.step === next.step &&
+        prev.stakeAddress === next.stakeAddress
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, []);
+
   // Restore session on mount
   useEffect(() => {
     const initAuth = () => {
@@ -43,19 +59,14 @@ export const useAuth = () => {
       const accessToken = getAccessTokenCookie();
       
       if (session && isSessionValid() && accessToken) {
-        setAuthState((prev) => ({
-          ...prev,
-          isAuthenticated: true,
-          accessToken,
-          step: 'authenticated',
-        }));
+        setAuth({ isAuthenticated: true, accessToken, step: 'authenticated' });
       }
       
       setIsInitialized(true); // ✅ Mark as initialized
     };
 
     initAuth();
-  }, []);
+  }, [setAuth]);
 
   // Hydrate stake address when walletAPI is available but stakeAddress is missing
   useEffect(() => {
@@ -65,13 +76,13 @@ export const useAuth = () => {
         const rewardAddresses = await walletAPI.getRewardAddresses();
         const stakeAddr = rewardAddresses && rewardAddresses.length > 0 ? rewardAddresses[0] : null;
         if (stakeAddr) {
-          setAuthState((prev) => ({ ...prev, stakeAddress: stakeAddr }));
+          setAuth({ stakeAddress: stakeAddr });
         }
       } catch (e) {
         // ignore silently; will be set during connect/authenticate
       }
     })();
-  }, [walletAPI, authState.stakeAddress]);
+  }, [walletAPI, authState.stakeAddress, setAuth]);
 
   // Auto-reconnect previously connected wallet and hydrate wallet + stakeAddress
   useEffect(() => {
@@ -108,7 +119,7 @@ export const useAuth = () => {
         };
 
         setWallet(connection);
-        setAuthState((prev) => ({ ...prev, step: 'connected', stakeAddress: stakeAddr }));
+        setAuth({ step: 'connected', stakeAddress: stakeAddr });
       } catch (e) {
         // if auto-reconnect fails, clear saved hint
         try { localStorage.removeItem('connectedWallet'); } catch {}
@@ -153,7 +164,7 @@ export const useAuth = () => {
         };
 
         setWallet(connection);
-        setAuthState((prev) => ({ ...prev, step: 'connected', stakeAddress }));
+        setAuth({ step: 'connected', stakeAddress });
         localStorage.setItem('connectedWallet', walletName);
 
         return connection;
@@ -174,9 +185,9 @@ export const useAuth = () => {
       return;
     }
 
-    setLoading(true);
     setError(null);
-    setAuthState((prev) => ({ ...prev, step: 'signing' }));
+    setLoading(true);
+    setAuth({ step: 'signing' });
 
     try {
       const challengeResult = await requestChallenge(wallet.address, wallet.name);
@@ -206,22 +217,13 @@ export const useAuth = () => {
 
       const session = createSession(wallet.address, wallet.name);
       saveSession(session);
-      setAuthState({
-        isAuthenticated: true,
-        accessToken,
-        step: 'authenticated',
-        stakeAddress,
-      });
+      setAuth({ isAuthenticated: true, accessToken, step: 'authenticated', stakeAddress });
 
       return { accessToken, address: wallet.address, walletName: wallet.name };
     } catch (err) {
       console.error('Authentication error:', err);
       setError(err instanceof Error ? err.message : 'Authentication failed');
-      setAuthState((prev) => ({
-        ...prev,
-        isAuthenticated: false,
-        step: 'connected',
-      }));
+      setAuth({ isAuthenticated: false, step: 'connected' });
       throw err;
     } finally {
       setLoading(false);
@@ -232,18 +234,13 @@ export const useAuth = () => {
     setError(null);
     setWallet(null);
     setWalletAPI(null);
-    setAuthState({
-      isAuthenticated: false,
-      accessToken: null,
-      step: 'select',
-      stakeAddress: null,
-    });
+    setAuth({ isAuthenticated: false, accessToken: null, step: 'select', stakeAddress: null });
     clearSession();
     removeAccessTokenCookie();
     localStorage.removeItem('connectedWallet');
   }, [setWallet, setWalletAPI]);
 
-  return {
+  const authReturn = useMemo(() => ({
     wallet,
     availableWallets,
     isAuthenticated: authState.isAuthenticated,
@@ -256,5 +253,20 @@ export const useAuth = () => {
     loading,
     error,
     isInitialized, // ✅ Export this
-  };
+  }), [
+    wallet,
+    availableWallets,
+    authState.isAuthenticated,
+    authState.accessToken,
+    authState.stakeAddress,
+    authState.step,
+    connectWallet,
+    authenticate,
+    disconnectWallet,
+    loading,
+    error,
+    isInitialized,
+  ]);
+
+  return authReturn;
 };

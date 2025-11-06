@@ -10,7 +10,7 @@ export interface MessagePayload {
   senderId: string;
   jobId: string;
   nonce: string;
-  content: string;
+  encryptedContent: string; // base64 string
   timestamp: number;
   messageType: 'text' | 'file' | 'image' | 'audio' | 'system';
   isEdited?: boolean;

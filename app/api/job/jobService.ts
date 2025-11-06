@@ -420,7 +420,7 @@ export const transportToMessagePayload = (
     senderId: transport.senderId,
     jobId: transport.jobId,
     nonce: transport.nonce,
-    content: transport.encryptedContent, // Encrypted content in MessagePayload.content
+    encryptedContent: transport.encryptedContent, // Encrypted content in MessagePayload.content
     timestamp: new Date(transport.createdAt).getTime(),
     messageType: transport.messageType || 'text',
     isEdited: transport.isEdited,
@@ -444,7 +444,7 @@ export const messagePayloadToTransport = (
   payload: import('@/types/chat-response.type').MessagePayload
 ): SendJobMessageRequest => {
   return {
-    encryptedContent: payload.content,
+    encryptedContent: payload.encryptedContent,
     nonce: payload.nonce,
     senderPublicKey: payload.metadata?.senderPublicKey || '',
   };

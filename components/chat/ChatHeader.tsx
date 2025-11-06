@@ -1,6 +1,17 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
 export const ChatHeader = ({ title, status }: { title: string; status: string }) => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    // Trigger fade-in animation when component mounts or updates
+    setIsVisible(false);
+    const timer = setTimeout(() => setIsVisible(true), 10);
+    return () => clearTimeout(timer);
+  }, [title, status]);
+
   const badge = (() => {
     switch (status) {
       case 'ACTIVE':
@@ -15,7 +26,11 @@ export const ChatHeader = ({ title, status }: { title: string; status: string })
   })();
 
   return (
-    <div className="flex items-center justify-between p-4 border-b border-gray-200">
+    <div 
+      className={`flex items-center justify-between p-4 border-b border-gray-200 transition-all duration-350 ease-in-out ${
+        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-[-10px]'
+      }`}
+    >
       <div>
         <h3 className="text-lg font-semibold">{title}</h3>
       </div>

@@ -46,14 +46,13 @@ export const useSendChat = (
   const { encodeMessage } = useChatE2ee();
   const { publicKey } = useChatKey();
   const { wallet } = useAuth();
-
   const sendText = useCallback(
     async (plaintext: string): Promise<SendMessageResponse> => {
       if (!wallet?.address) throw new Error('Wallet not connected');
       if (!publicKey) throw new Error('E2EE public key not available');
       if (!plaintext.trim()) throw new Error('Message is empty');
 
-      const peerPublicKey = resolvePeerPublicKey();
+      const peerPublicKey = resolvePeerPublicKey() || Buffer.from('');
       const { encrypted, nonce } = encodeMessage(plaintext, peerPublicKey);
 
       const payload: MessagePayload = {
@@ -61,7 +60,7 @@ export const useSendChat = (
         senderId: wallet.address,
         jobId,
         // transport: store encrypted data in content; nonce alongside
-        content: Buffer.from(encrypted).toString('base64'),
+        encryptedContent: Buffer.from(encrypted).toString('base64'),
         nonce: Buffer.from(nonce).toString('base64'),
         timestamp: Date.now(),
         messageType: 'text',
@@ -85,6 +84,7 @@ export const useSendChat = (
  */
 // TODO: Cần thay đổi để lấy public key từ job details
 export const usePeerPublicKey = (jobId: string | undefined, job: { aladinId: string; genieId: string } | undefined, currentAddress: string | undefined) => {
+  
   const peerAddress = useMemo(() => {
     if (!job || !currentAddress) return undefined;
     return job.aladinId === currentAddress ? job.genieId : job.aladinId;
@@ -139,7 +139,6 @@ export const useResolvePeerPublicKey = (
   currentAddress: string | undefined
 ) => {
   const { peerPublicKey } = usePeerPublicKey(jobId, job, currentAddress);
-
   return useCallback(() => {
     if (!peerPublicKey) {
       throw new Error('Peer public key not available. Please wait for it to load.');
@@ -147,5 +146,3 @@ export const useResolvePeerPublicKey = (
     return peerPublicKey;
   }, [peerPublicKey]);
 };
-
-

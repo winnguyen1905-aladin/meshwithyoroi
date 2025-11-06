@@ -16,6 +16,7 @@ import { chatReducer, initialChatState } from './chat-reducer';
 import { useChatE2ee } from '@/hooks/use-e2ee';
 import { useChatKey } from '@/context/chatkey-context';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/use-auth';
 
 const CHAT_NAMESPACE = '/chat' as const;
 
@@ -34,6 +35,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const { decodeMessage } = useChatE2ee();
   const { privateKey } = useChatKey();
   const queryClient = useQueryClient();
+  const { stakeAddress } = useAuth();
 
   useEffect(() => {
     const client = socketManager.getSocket(CHAT_NAMESPACE, {});
@@ -44,16 +46,15 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     const handleNewMessage = (data: MessagePayload) => {
       // Decrypt message if it's encrypted
       let decryptedMessage = data;
-      
       // Check if message is encrypted (has nonce and encrypted content)
-      if (data.nonce && data.content && data.metadata?.encrypted && data.metadata?.senderPublicKey) {
+      if (data.nonce && data.encryptedContent && data.metadata?.encrypted && data.metadata?.senderPublicKey) {
         try {
           if (!privateKey) {
             console.warn('Cannot decrypt message: private key not available');
             // Store encrypted message with error indicator
             decryptedMessage = {
               ...data,
-              content: '[Encrypted - Key not available]',
+              encryptedContent: '[Encrypted - Key not available]',
               metadata: {
                 ...data.metadata,
                 decryptionError: 'Private key not available',
@@ -63,7 +64,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             const senderPublicKey = Buffer.from(data.metadata.senderPublicKey, 'base64');
             const nonce = Buffer.from(data.nonce, 'base64');
             // content is already base64 string from socket
-            const encryptedContent = data.content;
+            const encryptedContent = data.encryptedContent;
             
             const decrypted = decodeMessage(
               encryptedContent,
@@ -74,7 +75,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             if (decrypted) {
               decryptedMessage = {
                 ...data,
-                content: new TextDecoder().decode(decrypted),
+                encryptedContent: new TextDecoder().decode(decrypted),
                 metadata: {
                   ...data.metadata,
                   decrypted: true,
@@ -84,7 +85,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
               console.warn('Failed to decrypt message:', data.id);
               decryptedMessage = {
                 ...data,
-                content: '[Failed to decrypt]',
+                encryptedContent: '[Failed to decrypt]',
                 metadata: {
                   ...data.metadata,
                   decryptionError: 'Decryption failed',
@@ -96,7 +97,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
           console.error('Error decrypting message:', error);
           decryptedMessage = {
             ...data,
-            content: '[Decryption error]',
+            encryptedContent: '[Decryption error]',
             metadata: {
               ...data.metadata,
               decryptionError: error instanceof Error ? error.message : 'Unknown error',
@@ -107,25 +108,24 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       
       addMessage(decryptedMessage.jobId, decryptedMessage);
       
-      // Invalidate conversations query to update sidebar with new message
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      // Sidebar will handle optimistic reorder per-scope to avoid global double-updates
     };
 
     socketClientRef.current = client;
     client.on('connect', handleConnect);
     client.on('disconnect', handleDisconnect);
-    client.on('chat:newMessage', handleNewMessage);
-
+    
+    client.on('contract:message.new', handleNewMessage);
     return () => {
       client.off('connect', handleConnect);
       client.off('disconnect', handleDisconnect);
-      client.off('chat:newMessage', handleNewMessage);
+      client.off('contract:message.new', handleNewMessage);
       socketClientRef.current = null;
     };
   }, [addMessage, decodeMessage, privateKey, queryClient]);
 
   const sendMessage = useCallback((message: MessagePayload): Promise<SendMessageResponse> => {
-    return socketClientRef.current?.emitWithAck('chat:sendMessage', message) || Promise.reject(new Error('Socket not connected'));
+    return socketClientRef.current?.emitWithAck('contract:message.send', message) || Promise.reject(new Error('Socket not connected'));
   }, []);
 
   const value = useMemo(() => ({ isConnected: state.isConnected, sendMessage }), [state.isConnected, sendMessage]);

@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ChatKeyProvider } from '@/context/chatkey-context';
 import { ChatProvider } from '@/context/chat-context';
-
+import { WalletProvider } from '@/context/wallet-context';
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -20,11 +20,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <WalletProvider>
       <ChatKeyProvider>
         <ChatProvider>
           {children}
         </ChatProvider>
       </ChatKeyProvider>
+      </WalletProvider>
     </QueryClientProvider>
   );
 }

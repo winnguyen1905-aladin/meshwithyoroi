@@ -71,7 +71,7 @@ export interface ServerToClientEvents {
   roomClosed: () => void;
   
   // Normal Chat events (Server to Client)
-  'chat:newMessage': (data: MessagePayload) => void;
+  'contract:message.new': (data: MessagePayload) => void;
   'chat:messageEdited': (data: MessageEditedData) => void;
   'chat:messageDeleted': (data: MessageDeletedData) => void;
   'chat:messagesRead': (data: MessagesReadData) => void;
@@ -101,7 +101,7 @@ export interface ClientToServerEvents {
   requestTransport: (data: ConsumeRequest) => Promise<ConsumeResponse>;
   
   // Normal Chat events (Client to Server)
-  'chat:sendMessage': (data: MessagePayload) => Promise<SendMessageResponse>;
+  'contract:message.send': (data: MessagePayload) => Promise<SendMessageResponse>;
   'chat:editMessage': (data: EditMessageRequest) => Promise<EditMessageResponse>;
   'chat:deleteMessage': (data: DeleteMessageRequest) => Promise<DeleteMessageResponse>;
   'chat:markRead': (data: MarkMessagesReadRequest) => Promise<MarkMessagesReadResponse>;

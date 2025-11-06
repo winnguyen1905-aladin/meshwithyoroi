@@ -2,19 +2,23 @@ import { SocketService } from '@/services/socket-client';
 import type { SocketOptions } from 'socket.io-client';
 
 class SocketManager {
-  
+
+  private readonly CHAT_NAMESPACE = 'chat';
+  private readonly CALL_NAMESPACE = 'call';
   private readonly namespaceToClient = new Map<string, SocketService>();
+
+    constructor() {
+      if (typeof window !== 'undefined') {
+        this.namespaceToClient.set(this.CHAT_NAMESPACE, new SocketService());
+        this.namespaceToClient.get(this.CALL_NAMESPACE), new SocketService();
+      }
+    }
 
   getSocket(namespace: string, options: Partial<SocketOptions> = {}): SocketService {
     const existing = this.namespaceToClient.get(namespace);
     if (existing) return existing;
-
     const client = new SocketService();
-    // Only connect on the client
-    if (typeof window !== 'undefined') {
-      client.connect(namespace, options);
-    }
-    
+    if (typeof window !== 'undefined') client.connect(namespace, options); 
     this.namespaceToClient.set(namespace, client);
     return client;
   }
@@ -39,5 +43,3 @@ class SocketManager {
 }
 
 export const socketManager = new SocketManager();
-
-
