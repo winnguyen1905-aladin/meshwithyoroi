@@ -2,26 +2,25 @@ import { SocketService } from '@/services/socket-client';
 import type { SocketOptions } from 'socket.io-client';
 
 class SocketManager {
-
+  
   private readonly CHAT_NAMESPACE = '/chat';
   private readonly CALL_NAMESPACE = '/call';
   private readonly namespaceToClient = new Map<string, SocketService>();
 
-    constructor() {
-      if (typeof window !== 'undefined') {
-        this.namespaceToClient.set(this.CHAT_NAMESPACE, new SocketService());
-        this.namespaceToClient.get(this.CALL_NAMESPACE)?.connect(this.CALL_NAMESPACE, {});
-      }
-    }
+    // constructor() {
+    //   if (typeof window !== 'undefined') {
+    //     this.namespaceToClient.set(this.CHAT_NAMESPACE, new SocketService());
+    //     this.namespaceToClient.set(this.CALL_NAMESPACE, new SocketService());
+    //   }
+    // }
 
   getSocket(namespace: string, options: Partial<SocketOptions> = {}): SocketService {
-    const client = this.namespaceToClient.get(namespace);
-    if (!client) throw new Error('Namespace not found');
+    const existing = this.namespaceToClient.get(namespace);
+    if (existing) return existing;
+    const client = new SocketService();
+    if (typeof window !== 'undefined') client.connect(namespace, options); 
+    this.namespaceToClient.set(namespace, client);
     return client;
-    // const client = new SocketService();
-    // if (typeof window !== 'undefined') client.connect(namespace, options); 
-    // this.namespaceToClient.set(namespace, client);
-    // return client;
   }
 
   has(namespace: string): boolean {
