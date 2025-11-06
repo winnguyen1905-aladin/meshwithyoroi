@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { devtools } from 'zustand/middleware';
 import { MessagePayload } from '@/types/chat-response.type';
 
 interface ChatStoreState {
@@ -8,45 +9,48 @@ interface ChatStoreState {
   addMessage: (jobId: string, message: MessagePayload) => void;
 }
 
-export const useChatStore = create<ChatStoreState>((set, get) => ({
-  clearMessages: (jobId: string) => set((state) => ({
-    messagesByJob: new Map(state.messagesByJob.set(jobId, [])),
-  })),
-  messagesByJob: new Map(),
-  addMessage: (jobId: string, message: MessagePayload) => set((state) => {
-    const existingMessages = state.messagesByJob.get(jobId) || [];
-    
-    // Check if message already exists by ID (only if ID is not empty)
-    if (message.id && message.id !== '') {
-      const messageExists = existingMessages.some(m => m.id === message.id);
-      if (messageExists) {
-        // Message already exists, return state unchanged
-        return state;
-      }
-    }
-    
-    // For messages without ID, check by timestamp + senderId + content to prevent duplicates
-    if (!message.id || message.id === '') {
-      const duplicateExists = existingMessages.some(m => 
-        m.timestamp === message.timestamp && 
-        m.senderId === message.senderId &&
-        m.plaintext === message.plaintext
-      );
-      if (duplicateExists) {
-        // Duplicate message found, return state unchanged
-        return state;
-      }
-    }
-    
-    // Add new message
-    return {
-      messagesByJob: new Map(state.messagesByJob.set(jobId, [...existingMessages, message])),
-    };
-  }),
-  getMessages: (jobId: string) => get().messagesByJob.get(jobId) || [],
-}));
+// Returns true if the incoming message is considered a duplicate of any existing one
+function isDuplicateMessage(existingMessages: MessagePayload[], incoming: MessagePayload): boolean {
+  if (incoming.id && incoming.id !== '') {
+    return existingMessages.some((message) => message.id === incoming.id);
+  }
 
-// Stable empty array to avoid creating a new array reference per render
+  return existingMessages.some((message) =>
+    message.timestamp === incoming.timestamp &&
+    message.senderId === incoming.senderId &&
+    message.plaintext === incoming.plaintext
+  );
+}
+
+export const useChatStore = create<ChatStoreState>()(
+  devtools(
+    (set, get) => ({
+      clearMessages: (jobId: string) =>
+        set((state) => {
+          const nextMessagesByJob = new Map(state.messagesByJob);
+          nextMessagesByJob.set(jobId, []);
+          return { messagesByJob: nextMessagesByJob };
+        }, false, 'chat/clearMessages'),
+      messagesByJob: new Map(),
+      addMessage: (jobId: string, message: MessagePayload) =>
+        set((state) => {
+          const existingMessages = state.messagesByJob.get(jobId) || [];
+
+          if (isDuplicateMessage(existingMessages, message)) {
+            return state;
+          }
+
+          const nextMessagesByJob = new Map(state.messagesByJob);
+          nextMessagesByJob.set(jobId, [...existingMessages, message]);
+
+          return { messagesByJob: nextMessagesByJob };
+        }, false, 'chat/addMessage'),
+      getMessages: (jobId: string) => get().messagesByJob.get(jobId) || [],
+    }),
+    { name: 'chat-store' }
+  )
+);
+
 const EMPTY_MESSAGES: MessagePayload[] = [];
 
 export const useJobMessages = (jobId: string) => 

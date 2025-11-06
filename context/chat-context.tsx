@@ -12,7 +12,7 @@ import {
 import { MessagePayload, SendMessageResponse } from '@/types/chat-response.type';
 import { socketManager } from '@/services/socket-manager';
 import { useChatStore } from '@/store/use-chat.store';
-import { chatReducer, initialChatState } from './chat-reducer';
+import { chatReducer, initialChatState } from '../store/chat-reducer';
 import { useChatE2ee } from '@/hooks/use-e2ee';
 import { useChatKey } from '@/context/chatkey-context';
 import { useQueryClient } from '@tanstack/react-query';
