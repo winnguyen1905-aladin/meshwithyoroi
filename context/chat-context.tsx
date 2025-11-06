@@ -47,7 +47,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       // Decrypt message if it's encrypted
       let decryptedMessage = data;
       // Check if message is encrypted (has nonce and encrypted content)
-      if (data.nonce && data.encryptedContent && data.metadata?.encrypted && data.metadata?.senderPublicKey) {
+      if (data.nonce && data.encryptedContent && data.metadata?.senderPublicKey) {
         try {
           if (!privateKey) {
             console.warn('Cannot decrypt message: private key not available');
@@ -75,7 +75,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             if (decrypted) {
               decryptedMessage = {
                 ...data,
-                encryptedContent: new TextDecoder().decode(decrypted),
+                plaintext: new TextDecoder().decode(decrypted),
+                encryptedContent: data.encryptedContent,
                 metadata: {
                   ...data.metadata,
                   decrypted: true,
@@ -85,7 +86,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
               console.warn('Failed to decrypt message:', data.id);
               decryptedMessage = {
                 ...data,
-                encryptedContent: '[Failed to decrypt]',
+                plaintext: '[Failed to decrypt]',
+                encryptedContent: data.encryptedContent,
                 metadata: {
                   ...data.metadata,
                   decryptionError: 'Decryption failed',
@@ -97,7 +99,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
           console.error('Error decrypting message:', error);
           decryptedMessage = {
             ...data,
-            encryptedContent: '[Decryption error]',
+            plaintext: '[Decryption error]',
             metadata: {
               ...data.metadata,
               decryptionError: error instanceof Error ? error.message : 'Unknown error',
@@ -117,6 +119,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     
     client.on('contract:message.new', handleNewMessage);
     return () => {
+      console.log('disconnecting from chat');
       client.off('connect', handleConnect);
       client.off('disconnect', handleDisconnect);
       client.off('contract:message.new', handleNewMessage);

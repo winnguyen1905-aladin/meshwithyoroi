@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useMemo, useState } from 'react';
+import { useEffect, useRef, useMemo, useState, useLayoutEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useJobMessages } from '@/store/use-chat.store';
 
@@ -12,10 +12,18 @@ export const MessageList = ({
   onLoadMore?: () => void;
 }) => {
   const listRef = useRef<HTMLDivElement | null>(null);
-  const messages = useJobMessages(jobId);
   const { stakeAddress } = useAuth();
+  const messages = useJobMessages(jobId);
+  const rafRef = useRef<number | null>(null);
   const previousJobIdRef = useRef<string>(jobId);
   const [isVisible, setIsVisible] = useState(false);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollToBottom = (smooth: boolean = false) => {
+    const sentinel = bottomRef.current;
+    if (!sentinel) return;
+    sentinel.scrollIntoView({ block: 'end', inline: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
+  };
 
   // Detect job change and trigger fade animation
   useEffect(() => {
@@ -31,12 +39,26 @@ export const MessageList = ({
     }
   }, [jobId]);
 
-  useEffect(() => {
-    // Auto scroll to bottom on new message
-    if (!listRef.current) return;
-    listRef.current.scrollTop = listRef.current.scrollHeight;
-    
+  useLayoutEffect(() => {
+    // Smooth scroll as soon as DOM updates with new message
+    scrollToBottom(true);
   }, [messages.length]);
+
+  useEffect(() => {
+    // Fallback: ensure scroll after paint
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => scrollToBottom(true));
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [messages.length]);
+
+  // Ensure scroll to bottom after fade-in when job changes
+  useEffect(() => {
+    if (!isVisible) return;
+    const t = setTimeout(() => scrollToBottom(false), 0);
+    return () => clearTimeout(t);
+  }, [isVisible, jobId]);
 
   const handleScroll = () => {
     const el = listRef.current;
@@ -50,11 +72,11 @@ export const MessageList = ({
       const isSelf = m.senderId === stakeAddress;
       // Create a unique key: prefer ID, fallback to timestamp + senderId + content hash + index for uniqueness
       // Using index as last resort ensures uniqueness even if other fields match
-      const uniqueKey = m.id || `${m.timestamp}-${m.senderId}-${m.encryptedContent.substring(0, 20)}-${index}`;
+      const uniqueKey = m.id || `${m.timestamp}-${m.senderId}-${m.plaintext?.substring(0, 20)}-${index}`;
       return (
         <div key={uniqueKey} className={`flex ${isSelf ? 'justify-end' : 'justify-start'}`}>
           <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${isSelf ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'}`}>
-            <div className="whitespace-pre-wrap break-words">{m.encryptedContent}</div>
+            <div className="whitespace-pre-wrap break-words">{m.plaintext}</div>
             <div className={`mt-1 text-[10px] ${isSelf ? 'text-blue-100' : 'text-gray-500'}`}>{new Date(m.timestamp).toLocaleTimeString()}</div>
           </div>
         </div>
@@ -71,6 +93,7 @@ export const MessageList = ({
       }`}
     >
       {renderedMessages}
+      <div ref={bottomRef} />
     </div>
   );
 };

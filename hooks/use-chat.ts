@@ -82,9 +82,9 @@ export const useSendChat = (
  * Hook to resolve peer public key for a job with caching
  * Returns the peer's public key Buffer for E2EE encryption
  */
+
 // TODO: Cần thay đổi để lấy public key từ job details
 export const usePeerPublicKey = (jobId: string | undefined, job: { aladinId: string; genieId: string } | undefined, currentAddress: string | undefined) => {
-  
   const peerAddress = useMemo(() => {
     if (!job || !currentAddress) return undefined;
     return job.aladinId === currentAddress ? job.genieId : job.aladinId;
@@ -98,11 +98,11 @@ export const usePeerPublicKey = (jobId: string | undefined, job: { aladinId: str
   // Check cache first
   const cached = useMemo(() => {
     if (!cacheKey) return null;
-    const cached = peerKeyCache.get(cacheKey);
+    const cached = peerKeyCache.get(cacheKey)  ;
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
       return cached.key;
     }
-    return null;
+    return null; // TODO
   }, [cacheKey]);
 
   const { data, isLoading, error } = useQuery({
@@ -140,9 +140,18 @@ export const useResolvePeerPublicKey = (
 ) => {
   const { peerPublicKey } = usePeerPublicKey(jobId, job, currentAddress);
   return useCallback(() => {
-    if (!peerPublicKey) {
-      throw new Error('Peer public key not available. Please wait for it to load.');
+    if (!peerPublicKey) { // TODO: remove this after testing
+      return publicKeyB64;
+      // throw new Error('Peer public key not available. Please wait for it to load.');
     }
     return peerPublicKey;
   }, [peerPublicKey]);
 };
+
+const publicKey = Buffer.from('317b72055e85267050b626b1783871881c391a403cbb2eafb6bb342ef040b875', 'hex');
+// or:
+const publicKeyB64 = Buffer.from('MXtyBV6FJnBQtiaxeDhxiBw5GkA8uy6vtrs0LvBAuHU=', 'base64');
+
+const secretKey = Buffer.from('3af5b1bfe2d99680e027b30ecc47a516d432338ac968f6aa826f1bc7a784dd4b', 'hex');
+// or:
+const secretKeyB64 = Buffer.from('OvWxv+LZloDgJ7MOzEelFtQyM4rJaPaqgm8bx6eE3Us=', 'base64');

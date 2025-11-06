@@ -197,8 +197,9 @@ export function useJobMessagesInfinite(jobId: string | undefined) {
           addMessage(message.jobId, {
             id: message.id,
             senderId: message.senderId,
-            jobId: message.jobId,
+            jobId: message.jobId, 
             nonce: message.nonce,
+            plaintext: new TextDecoder().decode(plaintext as Uint8Array),
             encryptedContent: message.encryptedContent,
             timestamp: new Date(message.createdAt).getTime(),
             messageType: 'text',
@@ -219,6 +220,7 @@ export function useJobMessagesInfinite(jobId: string | undefined) {
             senderId: message.senderId,
             jobId: message.jobId,
             nonce: message.nonce,
+            plaintext: '[Decryption error]',
             encryptedContent: '[Decryption error]',
             timestamp: new Date(message.createdAt).getTime(),
             messageType: 'text',

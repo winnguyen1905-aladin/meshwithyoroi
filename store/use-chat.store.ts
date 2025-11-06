@@ -30,7 +30,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       const duplicateExists = existingMessages.some(m => 
         m.timestamp === message.timestamp && 
         m.senderId === message.senderId &&
-        m.encryptedContent === message.encryptedContent
+        m.plaintext === message.plaintext
       );
       if (duplicateExists) {
         // Duplicate message found, return state unchanged

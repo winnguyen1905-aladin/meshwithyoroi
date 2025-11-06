@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 
 export const ChatHeader = ({ title, status }: { title: string; status: string }) => {
-  const [isVisible, setIsVisible] = useState(false);
 
+  const [isVisible, setIsVisible] = useState(false);
+  
   useEffect(() => {
     // Trigger fade-in animation when component mounts or updates
     setIsVisible(false);
