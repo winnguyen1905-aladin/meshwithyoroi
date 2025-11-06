@@ -189,10 +189,7 @@ export function useJobMessagesInfinite(jobId: string | undefined) {
             senderPublicKeyBytes,
             nonceBytes);
 
-          const isDecrypted = !!plaintext;
-          const encryptedContent = isDecrypted
-            ? new TextDecoder().decode(plaintext as Uint8Array)
-            : '[Failed to decrypt]';
+          const isDecrypted = !!plaintext; 
 
           addMessage(message.jobId, {
             id: message.id,

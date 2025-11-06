@@ -34,7 +34,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const socketClientRef = useRef<ReturnType<typeof socketManager.getSocket> | null>(null);
   const { decodeMessage } = useChatE2ee();
   const { privateKey } = useChatKey();
-  const queryClient = useQueryClient();
 
   useEffect(() => {
     const client = socketManager.getSocket(CHAT_NAMESPACE, {});
@@ -125,7 +124,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       client.off('contract:message.new', handleNewMessage);
       socketClientRef.current = null;
     };
-  }, [addMessage, decodeMessage, privateKey, queryClient]);
+  }, [addMessage, decodeMessage, privateKey]);
 
   const sendMessage = useCallback((message: MessagePayload): Promise<SendMessageResponse> => {
     return socketClientRef.current?.emitWithAck('contract:message.send', message) || Promise.reject(new Error('Socket not connected'));
